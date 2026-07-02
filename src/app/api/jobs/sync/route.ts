@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+export const dynamic = 'force-dynamic';
 import { fetchGreenhouseJobs } from "@/lib/sources/greenhouse";
 import { fetchLeverJobs } from "@/lib/sources/lever";
 import { fetchAdzunaJobs } from "@/lib/sources/adzuna";
