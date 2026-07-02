@@ -106,10 +106,7 @@ export default function Dashboard() {
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    const file = e.target.files[0];
-    
+  const processFile = async (file: File) => {
     setActionLoading('upload');
     const formData = new FormData();
     formData.append("file", file);
@@ -119,13 +116,40 @@ export default function Dashboard() {
         method: "POST",
         body: formData
       });
-      if (!res.ok) throw new Error("Fallo la subida");
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || "Fallo la subida");
+      }
       showNotification("CV subido y parseado correctamente", "success");
-    } catch (error) {
-      showNotification("Error al subir el CV", "error");
+    } catch (error: any) {
+      console.error(error);
+      showNotification(error.message || "Error al subir el CV", "error");
     } finally {
       setActionLoading(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    await processFile(e.target.files[0]);
+  };
+
+  const [isDragging, setIsDragging] = useState(false);
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processFile(e.dataTransfer.files[0]);
     }
   };
 
@@ -164,7 +188,13 @@ export default function Dashboard() {
       <div className="dashboard-content">
         {activeTab === 'cv' && (
           <div className="upload-section glass animate-fade-in">
-            <div className="upload-box">
+            <div 
+              className={`upload-box ${isDragging ? 'dragging' : ''}`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              style={{ border: isDragging ? '2px dashed var(--accent)' : '2px dashed var(--card-border)', background: isDragging ? 'rgba(96, 165, 250, 0.05)' : 'rgba(0,0,0,0.1)' }}
+            >
               <UploadCloud size={48} className="upload-icon" />
               <h3>Sube tu CV base</h3>
               <p>Arrastra tu PDF aquí o haz clic para explorar.</p>
