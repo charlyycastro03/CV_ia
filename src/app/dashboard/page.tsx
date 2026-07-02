@@ -205,7 +205,7 @@ export default function Dashboard() {
               </div>
             ) : jobs.length === 0 ? (
               <div className="empty-state glass">
-                <p>No tienes vacantes sincronizadas todavía. Pulsa "Sincronizar Nuevas" para empezar.</p>
+                <p>No tienes vacantes sincronizadas todavía. Pulsa &quot;Sincronizar Nuevas&quot; para empezar.</p>
               </div>
             ) : (
               <div className="jobs-grid">
