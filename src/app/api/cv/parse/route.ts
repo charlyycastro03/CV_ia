@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-const pdf = require("pdf-parse");
+// @ts-ignore
+import pdf from "pdf-parse";
 import { model } from "@/lib/gemini";
 import { supabaseServer } from "@/lib/supabase";
 
