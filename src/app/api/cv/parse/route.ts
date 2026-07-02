@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-// @ts-ignore
-import pdf from "pdf-parse";
+import "pdf-parse"; // Fuerce el empaquetado en Vercel
 import { model } from "@/lib/gemini";
 import { supabaseServer } from "@/lib/supabase";
 
 export async function POST(req: NextRequest) {
   try {
+    const pdf = require("pdf-parse");
     const form = await req.formData();
     const file = form.get("file") as File;
     if (!file) {
