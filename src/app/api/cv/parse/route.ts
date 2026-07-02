@@ -48,7 +48,11 @@ export async function POST(req: NextRequest) {
     // Guardamos el JSON como raw_text para futuras referencias (ya no ocupamos el texto plano crudo)
     const { data, error } = await supabase
       .from("cv_master")
-      .insert({ raw_text: JSON.stringify(structured), structured })
+      .insert({ 
+        user_id: "00000000-0000-0000-0000-000000000000",
+        raw_text: JSON.stringify(structured), 
+        structured 
+      })
       .select()
       .single();
 
