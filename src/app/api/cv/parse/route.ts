@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import "pdf-parse"; // Fuerce el empaquetado en Vercel
 import { model } from "@/lib/gemini";
 import { supabaseServer } from "@/lib/supabase";
 
 export async function POST(req: NextRequest) {
   try {
-    const pdf = require("pdf-parse");
     const form = await req.formData();
     const file = form.get("file") as File;
     if (!file) {
@@ -14,38 +12,43 @@ export async function POST(req: NextRequest) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    const rawText =
-      file.type === "application/pdf"
-        ? (await pdf(buffer)).text
-        : buffer.toString("utf-8"); // simplificado
-
     const prompt = `
     Extrae el siguiente CV a un JSON con esta forma exacta, sin inventar
-    nada que no esté en el texto:
+    nada que no esté en el documento:
     {
       "nombre": "", "contacto": {}, "resumen": "",
       "experiencia": [{"puesto":"","empresa":"","periodo":"","logros":[]}],
       "educacion": [{"titulo":"","institucion":"","anio":""}],
       "skills": [], "idiomas": []
     }
-    Texto del CV:
-    ---
-    ${rawText}
-    ---
     Responde SOLO el JSON, sin texto adicional (ni siquiera \`\`\`json).`;
 
-    const result = await model.generateContent(prompt);
+    let result;
+    if (file.type === "application/pdf") {
+      // Gemini 1.5 Flash soporta lectura nativa de PDFs!
+      result = await model.generateContent([
+        {
+          inlineData: {
+            data: buffer.toString("base64"),
+            mimeType: "application/pdf"
+          }
+        },
+        prompt
+      ]);
+    } else {
+      const rawText = buffer.toString("utf-8");
+      result = await model.generateContent([rawText, prompt]);
+    }
+
     const responseText = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
     const structured = JSON.parse(responseText);
 
     const supabase = supabaseServer();
     
-    // Asumimos un user dummy para uso personal o deberías usar auth.uid()
-    // En este caso, no estamos logueados por UI, así que insertaremos sin RLS (usando service role)
-    // Opcionalmente podemos usar un ID fijo para tu usuario.
+    // Guardamos el JSON como raw_text para futuras referencias (ya no ocupamos el texto plano crudo)
     const { data, error } = await supabase
       .from("cv_master")
-      .insert({ raw_text: rawText, structured })
+      .insert({ raw_text: JSON.stringify(structured), structured })
       .select()
       .single();
 
@@ -53,6 +56,7 @@ export async function POST(req: NextRequest) {
     
     return NextResponse.json(data);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Parse API Error:", error);
+    return NextResponse.json({ error: error.message || "Unknown error" }, { status: 500 });
   }
 }
