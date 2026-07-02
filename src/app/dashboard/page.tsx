@@ -16,8 +16,16 @@ export default function Dashboard() {
     try {
       const res = await fetch("/api/matches/list");
       const data = await res.json();
-      setJobs(data);
+      if (Array.isArray(data)) {
+        setJobs(data);
+      } else {
+        console.error("API Error:", data);
+        setJobs([]);
+        showNotification(data.error || "Falta configurar credenciales en Vercel", "error");
+      }
     } catch (error) {
+      console.error(error);
+      setJobs([]);
       showNotification("Error al cargar vacantes", "error");
     } finally {
       setLoading(false);
