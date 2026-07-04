@@ -4,18 +4,19 @@ export function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   
+  // Clean aggressively to remove any accidental quotes, single quotes or spaces
+  const cleanUrl = (url || '').replace(/['"]/g, '').trim()
+  const cleanKey = (key || '').replace(/['"]/g, '').trim()
+
   console.log("DEBUG ENV:", { 
     urlExists: !!url, 
-    urlValue: url,
+    cleanUrlValue: cleanUrl,
     keyExists: !!key 
   })
 
-  if (!url || !key) {
-    console.error("🚨 ALERTA CRÍTICA: Faltan variables de entorno de Supabase en Vercel. Asegúrate de llamarlas exactamente NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY")
+  if (!cleanUrl || !cleanKey) {
+    console.error("🚨 ALERTA CRÍTICA: Faltan variables de entorno de Supabase en Vercel.")
   }
 
-  return createBrowserClient(
-    (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim(),
-    (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim()
-  )
+  return createBrowserClient(cleanUrl, cleanKey)
 }
