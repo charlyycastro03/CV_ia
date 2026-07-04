@@ -41,32 +41,39 @@ export async function GET(req: NextRequest) {
           .from('jobs')
           .select('id')
           .eq('external_id', job.id.toString())
-          .single()
+          .maybeSingle()
 
         let dbJobId
         if (!existingJob) {
-          const { data: insertedJob } = await supabase.from('jobs').insert({
+          const { data: insertedJob, error: insertJobErr } = await supabase.from('jobs').insert({
             title: job.title,
             company: job.company_name,
             location: job.candidate_required_location,
             description: job.description,
             external_id: job.id.toString(),
             url: job.url
-          }).select('id').single()
-          if(insertedJob) dbJobId = insertedJob.id
+          }).select('id').maybeSingle()
+          
+          if (insertJobErr) {
+            console.error('Error inserting job:', insertJobErr.message)
+          }
+          if (insertedJob) dbJobId = insertedJob.id
         } else {
           dbJobId = existingJob.id
         }
 
-        if (!dbJobId) continue
+        if (!dbJobId) {
+          console.error('Skipping job evaluation because dbJobId could not be obtained (RLS issue?)')
+          continue
+        }
 
         // Check if application/evaluation already exists
-        const { data: existingApp } = await supabase
+        const { data: existingApp, error: appErr } = await supabase
           .from('applications')
           .select('id')
           .eq('user_id', profile.user_id)
           .eq('job_id', dbJobId)
-          .single()
+          .maybeSingle()
 
         if (existingApp) {
           continue; // Already processed this job for this user
@@ -79,7 +86,7 @@ export async function GET(req: NextRequest) {
         // Determine status: >90% -> Auto-Apply, otherwise -> Review
         const status = match.score >= 90 ? 'applied_automatically' : 'pending_review'
 
-        await supabase.from('applications').insert({
+        const { error: insertAppErr } = await supabase.from('applications').insert({
           user_id: profile.user_id,
           job_id: dbJobId,
           status: status,
@@ -87,7 +94,9 @@ export async function GET(req: NextRequest) {
           match_details: match
         })
 
-        if (status === 'applied_automatically') {
+        if (insertAppErr) {
+          console.error('Error inserting application:', insertAppErr.message)
+        } else if (status === 'applied_automatically') {
           newAutoApplications++
           // Aquí se integraría lógica para enviar email al usuario (ej: Resend) 
           // indicándole que se ha aplicado automáticamente a esta vacante.

@@ -1,19 +1,47 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { CVUpload } from '@/components/cv/CVUpload'
 import { CVPreview } from '@/components/cv/CVPreview'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react'
 import { FadeIn } from '@/components/animations/FadeIn'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 
 export default function CVUploadPage() {
   const router = useRouter()
   const [cvData, setCvData] = useState<any>(null)
   const [showPreview, setShowPreview] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('cv_data')
+            .eq('user_id', user.id)
+            .maybeSingle()
+          
+          if (profile?.cv_data) {
+            setCvData(profile.cv_data)
+            setShowPreview(true)
+          }
+        }
+      } catch (e) {
+        console.error(e)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchProfile()
+  }, [])
 
   const handleUploadComplete = (data: any) => {
     setCvData(data)
@@ -21,12 +49,20 @@ export default function CVUploadPage() {
   }
 
   const handleContinue = () => {
-    router.push('/')
+    router.push('/dashboard')
   }
 
-  const handleReset = () => {
+  const handleDelete = () => {
     setCvData(null)
     setShowPreview(false)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
   return (
@@ -34,7 +70,7 @@ export default function CVUploadPage() {
       <div className="max-w-4xl mx-auto">
         <FadeIn>
           <Link 
-            href="/"
+            href="/dashboard"
             className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -43,11 +79,11 @@ export default function CVUploadPage() {
 
           <div className="mb-8">
             <h1 className="text-3xl font-bold mb-2">
-              {showPreview ? 'Revisa tu CV' : 'Sube tu Currículum'}
+              {showPreview ? 'Tu Currículum' : 'Sube tu Currículum'}
             </h1>
             <p className="text-muted-foreground">
               {showPreview 
-                ? 'Verifica que la información extraída sea correcta'
+                ? 'Revisa y edita tu información para mejorar tus posibilidades'
                 : 'Nuestra IA analizará tu CV y extraerá tu información automáticamente'
               }
             </p>
@@ -57,35 +93,16 @@ export default function CVUploadPage() {
             <CVUpload onUploadComplete={handleUploadComplete} />
           ) : (
             <div className="space-y-6">
-              <Card className="border-green-500/50 bg-green-500/5">
-                <CardContent className="pt-6">
-                  <div className="flex items-center space-x-3">
-                    <CheckCircle2 className="w-6 h-6 text-green-500" />
-                    <div>
-                      <p className="font-semibold">CV cargado exitosamente</p>
-                      <p className="text-sm text-muted-foreground">
-                        La información ha sido extraída y está lista para revisar
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <CVPreview cvData={cvData} />
+              {/* Optional success banner can be shown here if needed */}
+              <CVPreview cvData={cvData} onSave={setCvData} onDelete={handleDelete} />
 
               <div className="flex gap-4 pb-24">
                 <Button 
-                  variant="outline" 
-                  onClick={handleReset}
-                  className="flex-1"
-                >
-                  Cargar otro CV
-                </Button>
-                <Button 
                   onClick={handleContinue}
                   className="flex-1"
+                  size="lg"
                 >
-                  Continuar al Dashboard
+                  Ir al Dashboard
                 </Button>
               </div>
             </div>
