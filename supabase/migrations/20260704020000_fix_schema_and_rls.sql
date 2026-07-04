@@ -6,13 +6,27 @@ DROP TABLE IF EXISTS matches CASCADE;
 DO $$
 BEGIN
     IF EXISTS(SELECT * FROM information_schema.columns WHERE table_name='jobs' and column_name='company') THEN
-        ALTER TABLE jobs RENAME COLUMN company TO company_name;
+        IF NOT EXISTS(SELECT * FROM information_schema.columns WHERE table_name='jobs' and column_name='company_name') THEN
+            ALTER TABLE jobs RENAME COLUMN company TO company_name;
+        ELSE
+            ALTER TABLE jobs DROP COLUMN company;
+        END IF;
     END IF;
+    
     IF EXISTS(SELECT * FROM information_schema.columns WHERE table_name='jobs' and column_name='apply_url') THEN
-        ALTER TABLE jobs RENAME COLUMN apply_url TO url;
+        IF NOT EXISTS(SELECT * FROM information_schema.columns WHERE table_name='jobs' and column_name='url') THEN
+            ALTER TABLE jobs RENAME COLUMN apply_url TO url;
+        ELSE
+            ALTER TABLE jobs DROP COLUMN apply_url;
+        END IF;
     END IF;
+    
     IF EXISTS(SELECT * FROM information_schema.columns WHERE table_name='jobs' and column_name='job_type') THEN
-        ALTER TABLE jobs RENAME COLUMN job_type TO type;
+        IF NOT EXISTS(SELECT * FROM information_schema.columns WHERE table_name='jobs' and column_name='type') THEN
+            ALTER TABLE jobs RENAME COLUMN job_type TO type;
+        ELSE
+            ALTER TABLE jobs DROP COLUMN job_type;
+        END IF;
     END IF;
 END $$;
 
