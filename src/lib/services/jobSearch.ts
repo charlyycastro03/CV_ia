@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from '../utils/fetchWithTimeout'
+
 export interface RemotiveJob {
   id: number
   url: string
@@ -15,7 +17,7 @@ export interface RemotiveJob {
 export async function fetchRemoteJobs(limit: number = 20): Promise<RemotiveJob[]> {
   try {
     // We fetch jobs from software dev category to keep it relevant
-    const response = await fetch('https://remotive.com/api/remote-jobs?category=software-dev&limit=' + limit)
+    const response = await fetchWithTimeout('https://remotive.com/api/remote-jobs?category=software-dev&limit=' + limit, {}, 8000)
     
     if (!response.ok) {
       throw new Error(`Remotive API error: ${response.statusText}`)

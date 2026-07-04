@@ -4,7 +4,7 @@ import { fetchRemoteJobs, filterJobsByLocation } from '@/lib/services/jobSearch'
 import { fetchGreenhouseJobs } from '@/lib/sources/greenhouse'
 import { fetchLeverJobs } from '@/lib/sources/lever'
 import { fetchAdzunaJobs } from '@/lib/sources/adzuna'
-import { calculateJobMatch } from '@/lib/services/jobMatcher'
+import { calculateJobMatch, generateTailoredCVAndLetter } from '@/lib/services/jobMatcher'
 import { sendAutoApplication } from '@/lib/services/autoApply'
 
 // Using service role client to bypass RLS for background jobs
@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    console.time('fetchExternalSources')
     // 1. Fetch from all sources in parallel
     const [
       remotiveRes,
@@ -36,6 +37,7 @@ export async function GET(req: NextRequest) {
       fetchLeverJobs('lever'),
       fetchAdzunaJobs('software engineer', 'us')
     ])
+    console.timeEnd('fetchExternalSources')
 
     // Extraemos resultados, manejando posibles rechazos
     const rawRemotive = remotiveRes.status === 'fulfilled' ? remotiveRes.value : []
@@ -182,10 +184,13 @@ export async function GET(req: NextRequest) {
           continue; // Already processed this job for this user
         }
 
-        // Evaluate match
-        const match = await calculateJobMatch(profile.cv_data, job)
         totalEvaluated++
+        console.time(`calculateJobMatch-${profile.user_id}-${job.title.substring(0,10)}`)
+        const match = await calculateJobMatch(profile.cv_data, job)
+        console.timeEnd(`calculateJobMatch-${profile.user_id}-${job.title.substring(0,10)}`)
         
+        if (!match) continue;
+
         await supabase.from('application_logs').insert({
           application_id: null,
           status: 'evaluated',
@@ -198,14 +203,22 @@ export async function GET(req: NextRequest) {
         
         let status = isAutoEligible ? 'applied_automatically' : 'pending_review'
         let applicationMethod = isAutoEligible ? 'auto' : 'assisted'
-        let tailoredCv = match.cv_adaptado || profile.cv_data // Assume calculateJobMatch returns this now (will fix next)
-        let coverLetter = match.carta || ''
+        
+        let tailoredCv = profile.cv_data // Default
+        let coverLetter = ''
 
         if (isAutoEligible) {
           if (localAppliedToday >= DAILY_LIMIT) {
              status = 'ready_to_apply'
              debugErrors.push(`User ${profile.user_id} reached auto-apply daily limit. Job ${job.title} set to ready_to_apply.`)
           } else {
+            console.time(`generateTailoredCV-${profile.user_id}-${job.title.substring(0,10)}`)
+            const tailoredResult = await generateTailoredCVAndLetter(profile.cv_data, job)
+            console.timeEnd(`generateTailoredCV-${profile.user_id}-${job.title.substring(0,10)}`)
+            
+            tailoredCv = tailoredResult.cv_adaptado
+            coverLetter = tailoredResult.carta
+
             // Attempt auto apply
             const applyResult = await sendAutoApplication(job, profile.cv_data, tailoredCv, coverLetter)
             

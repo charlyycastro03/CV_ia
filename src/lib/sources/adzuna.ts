@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from '../utils/fetchWithTimeout'
+
 export async function fetchAdzunaJobs(query: string, country = "us") {
   const appId = process.env.ADZUNA_APP_ID;
   const appKey = process.env.ADZUNA_APP_KEY;
@@ -8,7 +10,7 @@ export async function fetchAdzunaJobs(query: string, country = "us") {
       `?app_id=${appId}` +
       `&app_key=${appKey}` +
       `&what=${encodeURIComponent(query)}&results_per_page=50`;
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url, {}, 8000);
     if (!res.ok) return [];
     const data = await res.json();
     return data.results.map((j: any) => ({

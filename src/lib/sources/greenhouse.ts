@@ -1,7 +1,11 @@
+import { fetchWithTimeout } from '../utils/fetchWithTimeout'
+
 export async function fetchGreenhouseJobs(boardToken: string) {
   try {
-    const res = await fetch(
-      `https://api.greenhouse.io/v1/boards/${boardToken}/jobs?content=true`
+    const res = await fetchWithTimeout(
+      `https://api.greenhouse.io/v1/boards/${boardToken}/jobs?content=true`,
+      {},
+      8000
     );
     if (!res.ok) return [];
     const data = await res.json();

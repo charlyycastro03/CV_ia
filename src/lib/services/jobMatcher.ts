@@ -6,8 +6,11 @@ export interface MatchResult {
   pros: string[]
   cons: string[]
   summary: string
-  cv_adaptado?: any
-  carta?: string
+}
+
+export interface TailoredResult {
+  cv_adaptado: any
+  carta: string
 }
 
 export async function calculateJobMatch(cvData: any, job: RemotiveJob): Promise<MatchResult> {
@@ -33,40 +36,115 @@ export async function calculateJobMatch(cvData: any, job: RemotiveJob): Promise<
       Descripción: ${cleanDescription}
 
       TAREA:
-      1. Evalúa qué tan compatible es el candidato con la vacante.
-      2. Adapta el CV del candidato resaltando SOLO la experiencia relevante para esta vacante, reescribiendo o reordenando logros (SIN inventar experiencia ni habilidades que no estén en el perfil original).
-      3. Escribe una carta de presentación breve (150 palabras) dirigida a la empresa.
+      Evalúa qué tan compatible es el candidato con la vacante.
 
       Debes devolver un JSON válido con la siguiente estructura estricta:
       {
         "score": 85, 
         "pros": ["Tiene experiencia en React", "Cumple con los años requeridos"],
         "cons": ["No menciona experiencia en AWS"],
-        "summary": "El candidato es un excelente fit técnico pero carece de algo de infraestructura.",
-        "cv_adaptado": { ... mismo esquema del CV original, optimizado ... },
-        "carta": "Estimado equipo de..."
+        "summary": "El candidato es un excelente fit técnico pero carece de algo de infraestructura."
       }
 
       REGLAS:
       - "score" debe ser un número entero entre 0 y 100. Sé objetivo.
       - "pros" y "cons" deben ser arreglos de strings cortos (máx 3 cada uno).
-      - "cv_adaptado" debe mantener la estructura original pero con textos optimizados con palabras clave de la vacante.
       - Responde SOLO con el objeto JSON, nada de texto markdown antes ni después.
     `
 
-    const result = await model.generateContent(prompt)
-    const textResponse = result.response.text()
-    const jsonString = textResponse.replace(/```json\n?|\n?```/g, '').trim()
-    
-    return JSON.parse(jsonString) as MatchResult
+    // Timeout de 15 segundos para la llamada a Gemini
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 15000)
+
+    try {
+      const result = await Promise.race([
+        model.generateContent(prompt),
+        new Promise<never>((_, reject) => {
+          controller.signal.addEventListener('abort', () => reject(new Error('Gemini timeout')))
+        })
+      ])
+      
+      clearTimeout(timeoutId)
+      const textResponse = result.response.text()
+      const jsonString = textResponse.replace(/```json\n?|\n?```/g, '').trim()
+      
+      return JSON.parse(jsonString) as MatchResult
+    } catch (e: any) {
+      clearTimeout(timeoutId)
+      throw e;
+    }
   } catch (error) {
     console.error('Error calculating match for job', job.title, error)
     // Fallback genérico en caso de error de IA o parseo
     return {
       score: 0,
       pros: [],
-      cons: ["Error al evaluar compatibilidad"],
+      cons: ["Error al evaluar compatibilidad: " + (error instanceof Error ? error.message : "Desconocido")],
       summary: "No se pudo completar el análisis."
     }
   }
 }
+
+export async function generateTailoredCVAndLetter(cvData: any, job: any): Promise<TailoredResult> {
+  try {
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+
+    const cleanDescription = (job.description || '').replace(/<[^>]*>?/gm, '').substring(0, 5000)
+
+    const prompt = `
+      Eres un experto redactor y reclutador.
+      Adapta el perfil del candidato (CV en JSON) para la vacante de empleo.
+
+      PERFIL DEL CANDIDATO:
+      ${JSON.stringify(cvData, null, 2)}
+
+      VACANTE:
+      Título: ${job.title}
+      Empresa: ${job.company_name || job.company}
+      Descripción: ${cleanDescription}
+
+      TAREA:
+      1. Adapta el CV del candidato resaltando SOLO la experiencia relevante para esta vacante, reescribiendo o reordenando logros (SIN inventar experiencia ni habilidades que no estén en el perfil original).
+      2. Escribe una carta de presentación breve (150 palabras) dirigida a la empresa.
+
+      Debes devolver un JSON válido con la siguiente estructura estricta:
+      {
+        "cv_adaptado": { ... mismo esquema del CV original, optimizado ... },
+        "carta": "Estimado equipo de..."
+      }
+
+      REGLAS:
+      - "cv_adaptado" debe mantener la estructura original pero con textos optimizados con palabras clave de la vacante.
+      - Responde SOLO con el objeto JSON, nada de texto markdown antes ni después.
+    `
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 20000) // 20s for heavy generation
+
+    try {
+      const result = await Promise.race([
+        model.generateContent(prompt),
+        new Promise<never>((_, reject) => {
+          controller.signal.addEventListener('abort', () => reject(new Error('Gemini timeout in generation')))
+        })
+      ])
+      
+      clearTimeout(timeoutId)
+      const textResponse = result.response.text()
+      const jsonString = textResponse.replace(/```json\n?|\n?```/g, '').trim()
+      
+      return JSON.parse(jsonString) as TailoredResult
+    } catch (e: any) {
+      clearTimeout(timeoutId)
+      throw e;
+    }
+  } catch (error) {
+    console.error('Error tailoring CV for job', job.title, error)
+    return {
+      cv_adaptado: cvData, // fallback to original
+      carta: ''
+    }
+  }
+}
+
