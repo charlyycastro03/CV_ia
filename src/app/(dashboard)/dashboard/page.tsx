@@ -28,7 +28,7 @@ export default function DashboardPage() {
           .from('profiles')
           .select('id')
           .eq('user_id', user.id)
-          .single()
+          .maybeSingle()
 
         const { count: appsCount } = await supabase
           .from('applications')

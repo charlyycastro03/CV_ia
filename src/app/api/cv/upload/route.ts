@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
       .from('profiles')
       .select('id')
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
 
     if (profile) {
       const { error: updateError } = await supabase.from('profiles').update({
