@@ -10,7 +10,6 @@ import { Label } from '@/components/ui/label'
 import { User, Mail, Phone, MapPin, Briefcase, GraduationCap, Award, Edit2, Save, X, Plus, Trash2 } from 'lucide-react'
 import { FadeIn } from '@/components/animations/FadeIn'
 import { createClient } from '@/lib/supabase/client'
-import { toast } from 'sonner' // Assuming sonner is used for toasts, or we can just use alert if not installed
 
 interface CVPreviewProps {
   cvData: any
