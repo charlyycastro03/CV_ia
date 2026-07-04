@@ -34,16 +34,19 @@ export async function GET(req: NextRequest) {
     }))
 
     // Fetch from other sources (using some mock target sites/queries for demo purposes)
-    const rawGreenhouse = await fetchGreenhouseJobs('stripe')
+    const rawGreenhouse = await fetchGreenhouseJobs('discord') // discord tiene empleos en greenhouse
     const greenhouseJobs = rawGreenhouse.map((j: any) => ({ ...j, company_name: j.company, url: j.apply_url }))
 
-    const rawLever = await fetchLeverJobs('netflix')
+    const rawGreenhouse2 = await fetchGreenhouseJobs('twitch') // twitch tiene empleos en greenhouse
+    const greenhouseJobs2 = rawGreenhouse2.map((j: any) => ({ ...j, company_name: j.company, url: j.apply_url }))
+
+    const rawLever = await fetchLeverJobs('lever') // lever usa lever
     const leverJobs = rawLever.map((j: any) => ({ ...j, company_name: j.company, url: j.apply_url }))
 
     const rawAdzuna = await fetchAdzunaJobs('software engineer', 'us')
     const adzunaJobs = rawAdzuna.map((j: any) => ({ ...j, company_name: j.company, url: j.apply_url }))
 
-    const allRawJobs = [...remotiveJobs, ...greenhouseJobs, ...leverJobs, ...adzunaJobs]
+    const allRawJobs = [...remotiveJobs, ...greenhouseJobs, ...greenhouseJobs2, ...leverJobs, ...adzunaJobs]
     
     let newAutoApplications = 0
     let totalEvaluated = 0
@@ -72,7 +75,7 @@ export async function GET(req: NextRequest) {
       // Filter location for remotive specifically, others are already globally queried or US specific
       const applicableJobs = allRawJobs.filter((job: any) => {
         if (job.source === 'remotive') {
-          return filterJobsByLocation([job as any], userLocation).length > 0;
+          return filterJobsByLocation([job.raw], userLocation).length > 0;
         }
         return true;
       })
