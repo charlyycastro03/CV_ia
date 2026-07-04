@@ -11,8 +11,8 @@ export interface MatchResult {
 export async function calculateJobMatch(cvData: any, job: RemotiveJob): Promise<MatchResult> {
   try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
-    // Using gemini-1.5-flash for speed and cost efficiency on loops
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+    // Using gemini-1.5-flash-latest for speed and cost efficiency on loops
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' })
 
     // Limpiamos un poco la descripción HTML del trabajo para no gastar tantos tokens
     // Remotive trae la descripción en HTML, usamos un simple regex para quitar tags o mandamos raw
