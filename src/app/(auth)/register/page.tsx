@@ -90,7 +90,7 @@ export default function RegisterPage() {
             Ir a Iniciar Sesión
           </Button>
         </CardContent>
-      </CardCard>
+      </Card>
     )
   }
 
