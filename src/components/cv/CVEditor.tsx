@@ -46,10 +46,16 @@ export function CVEditor({ initialData, onSaveComplete }: CVEditorProps) {
 
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
-      await supabase.from('profiles').update({
+      const { error: dbError } = await supabase.from('profiles').upsert({
+        user_id: user.id,
         cv_data: data,
         updated_at: new Date().toISOString()
-      }).eq('user_id', user.id)
+      })
+      if (dbError) {
+        alert("Error al guardar: " + dbError.message)
+        setIsSaving(false)
+        return
+      }
     }
     
     setIsSaving(false)
