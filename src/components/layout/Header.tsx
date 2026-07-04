@@ -4,24 +4,22 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Moon, Sun, Settings, LogOut } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useTheme } from 'next-themes'
 
 interface HeaderProps {
   user: any
 }
 
 export function Header({ user }: HeaderProps) {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' || 'light'
-    setTheme(savedTheme)
+    setMounted(true)
   }, [])
 
   const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light'
-    setTheme(newTheme)
-    localStorage.setItem('theme', newTheme)
-    document.documentElement.classList.toggle('dark')
+    setTheme(theme === 'light' ? 'dark' : 'light')
   }
 
   return (

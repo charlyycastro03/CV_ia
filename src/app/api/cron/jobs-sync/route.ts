@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
         if (!existingJob) {
           const { data: insertedJob, error: insertJobErr } = await supabase.from('jobs').insert({
             title: job.title,
-            company: job.company_name,
+            company_name: job.company_name,
             location: job.candidate_required_location,
             description: job.description,
             external_id: job.id.toString(),
@@ -98,8 +98,8 @@ export async function GET(req: NextRequest) {
         const match = await calculateJobMatch(profile.cv_data, job)
         totalEvaluated++
 
-        // Determine status: >90% -> Auto-Apply, otherwise -> Review
-        const status = match.score >= 90 ? 'applied_automatically' : 'pending_review'
+        // Determine status: >90% -> Ready to apply, otherwise -> Review
+        const status = match.score >= 90 ? 'ready_to_apply' : 'pending_review'
 
         const { error: insertAppErr } = await supabase.from('applications').insert({
           user_id: profile.user_id,
@@ -112,7 +112,7 @@ export async function GET(req: NextRequest) {
         if (insertAppErr) {
           debugErrors.push('Error inserting application (RLS?): ' + insertAppErr.message)
           console.error('Error inserting application:', insertAppErr.message)
-        } else if (status === 'applied_automatically') {
+        } else if (status === 'ready_to_apply') {
           newAutoApplications++
         }
       }

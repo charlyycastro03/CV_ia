@@ -8,34 +8,15 @@ import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Moon, Sun, Monitor, Palette } from 'lucide-react'
 import { FadeIn } from '@/components/animations/FadeIn'
+import { useTheme } from 'next-themes'
 
 export default function SettingsPage() {
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system')
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    // Cargar tema guardado
-    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | 'system' || 'system'
-    setTheme(savedTheme)
-    applyTheme(savedTheme)
+    setMounted(true)
   }, [])
-
-  const applyTheme = (newTheme: 'light' | 'dark' | 'system') => {
-    const root = document.documentElement
-    
-    if (newTheme === 'system') {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-      root.classList.toggle('dark', prefersDark)
-    } else {
-      root.classList.toggle('dark', newTheme === 'dark')
-    }
-    
-    localStorage.setItem('theme', newTheme)
-  }
-
-  const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
-    setTheme(newTheme)
-    applyTheme(newTheme)
-  }
 
   return (
     <div className="space-y-6">
@@ -67,7 +48,7 @@ export default function SettingsPage() {
               <div className="grid grid-cols-3 gap-3">
                 <Button
                   variant={theme === 'light' ? 'default' : 'outline'}
-                  onClick={() => handleThemeChange('light')}
+                  onClick={() => setTheme('light')}
                   className="flex flex-col items-center gap-2 h-auto py-4"
                 >
                   <Sun className="h-5 w-5" />
@@ -75,7 +56,7 @@ export default function SettingsPage() {
                 </Button>
                 <Button
                   variant={theme === 'dark' ? 'default' : 'outline'}
-                  onClick={() => handleThemeChange('dark')}
+                  onClick={() => setTheme('dark')}
                   className="flex flex-col items-center gap-2 h-auto py-4"
                 >
                   <Moon className="h-5 w-5" />
@@ -83,7 +64,7 @@ export default function SettingsPage() {
                 </Button>
                 <Button
                   variant={theme === 'system' ? 'default' : 'outline'}
-                  onClick={() => handleThemeChange('system')}
+                  onClick={() => setTheme('system')}
                   className="flex flex-col items-center gap-2 h-auto py-4"
                 >
                   <Monitor className="h-5 w-5" />

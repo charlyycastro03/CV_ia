@@ -16,7 +16,7 @@ export function JobCard({ application, delay = 0 }: JobCardProps) {
   
   const job = application.jobs
   const matchDetails = application.match_details || { pros: [], cons: [], summary: '' }
-  const isAutoApplied = application.status === 'applied_automatically'
+  const isAutoApplied = application.status === 'ready_to_apply'
 
   // Score color logic
   const score = application.match_score
@@ -33,7 +33,7 @@ export function JobCard({ application, delay = 0 }: JobCardProps) {
             <div>
               <CardTitle className="text-xl font-bold">{job.title}</CardTitle>
               <div className="flex items-center space-x-4 mt-2 text-sm text-muted-foreground">
-                <span className="flex items-center"><Building className="w-4 h-4 mr-1"/> {job.company}</span>
+                <span className="flex items-center"><Building className="w-4 h-4 mr-1"/> {job.company_name}</span>
                 <span className="flex items-center"><MapPin className="w-4 h-4 mr-1"/> {job.location}</span>
               </div>
             </div>
@@ -50,7 +50,7 @@ export function JobCard({ application, delay = 0 }: JobCardProps) {
           {isAutoApplied && (
             <div className="mb-4 inline-flex items-center bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-semibold">
               <CheckCircle className="w-4 h-4 mr-2" />
-              Aplicación Automática Enviada
+              Alta compatibilidad — lista para aplicar
             </div>
           )}
           

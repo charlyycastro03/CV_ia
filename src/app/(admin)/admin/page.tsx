@@ -32,7 +32,7 @@ export default async function AdminDashboardPage() {
   const { count: autoApplied } = await supabase
     .from('applications')
     .select('*', { count: 'exact', head: true })
-    .eq('status', 'applied_automatically')
+    .eq('status', 'ready_to_apply')
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-8">
@@ -83,7 +83,7 @@ export default async function AdminDashboardPage() {
         <SlideIn delay={0.4}>
           <Card className="border-primary/50 bg-primary/5">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-primary">Auto-Aplicaciones</CardTitle>
+              <CardTitle className="text-sm font-medium text-primary">Alta Compatibilidad</CardTitle>
               <Briefcase className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>

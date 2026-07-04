@@ -13,16 +13,50 @@ export default function RegisterPage() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [age, setAge] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
+  const validatePassword = (pwd: string) => {
+    const minLength = pwd.length >= 8
+    const hasUppercase = /[A-Z]/.test(pwd)
+    const hasLowercase = /[a-z]/.test(pwd)
+    const hasNumber = /[0-9]/.test(pwd)
+    
+    return {
+      valid: minLength && hasUppercase && hasLowercase && hasNumber,
+      requirements: { minLength, hasUppercase, hasLowercase, hasNumber }
+    }
+  }
+
+  const passwordValidation = validatePassword(password)
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError(null)
+    
+    if (!age || parseInt(age) < 18 || parseInt(age) > 100) {
+      setError('Por favor ingresa una edad válida (18-100)')
+      setIsLoading(false)
+      return
+    }
+
+    if (!passwordValidation.valid) {
+      setError('La contraseña no cumple con los requisitos')
+      setIsLoading(false)
+      return
+    }
+
+    if (password !== confirmPassword) {
+      setError('Las contraseñas no coinciden')
+      setIsLoading(false)
+      return
+    }
     
     // Register user in Supabase Auth
     const { data, error: authError } = await supabase.auth.signUp({
@@ -31,6 +65,7 @@ export default function RegisterPage() {
       options: {
         data: {
           full_name: name,
+          age: parseInt(age),
         },
         emailRedirectTo: `${window.location.origin}/auth/callback`,
       }
@@ -121,6 +156,19 @@ export default function RegisterPage() {
             />
           </div>
           <div className="space-y-2">
+            <Label htmlFor="age">Edad</Label>
+            <Input
+              id="age"
+              type="number"
+              placeholder="25"
+              min="18"
+              max="100"
+              value={age}
+              onChange={(e) => setAge(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input 
               id="email" 
@@ -139,8 +187,36 @@ export default function RegisterPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required 
-              minLength={6}
             />
+            {password && (
+              <div className="space-y-1 text-xs mt-2">
+                <p className={passwordValidation.requirements.minLength ? 'text-green-500' : 'text-muted-foreground'}>
+                  {passwordValidation.requirements.minLength ? '✓' : '○'} Mínimo 8 caracteres
+                </p>
+                <p className={passwordValidation.requirements.hasUppercase ? 'text-green-500' : 'text-muted-foreground'}>
+                  {passwordValidation.requirements.hasUppercase ? '✓' : '○'} Una letra mayúscula
+                </p>
+                <p className={passwordValidation.requirements.hasLowercase ? 'text-green-500' : 'text-muted-foreground'}>
+                  {passwordValidation.requirements.hasLowercase ? '✓' : '○'} Una letra minúscula
+                </p>
+                <p className={passwordValidation.requirements.hasNumber ? 'text-green-500' : 'text-muted-foreground'}>
+                  {passwordValidation.requirements.hasNumber ? '✓' : '○'} Un número
+                </p>
+              </div>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirmPassword">Confirmar contraseña</Label>
+            <Input
+              id="confirmPassword"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+            />
+            {confirmPassword && password !== confirmPassword && (
+              <p className="text-xs text-red-500 mt-1">Las contraseñas no coinciden</p>
+            )}
           </div>
           <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? 'Registrando...' : 'Registrarse'}
