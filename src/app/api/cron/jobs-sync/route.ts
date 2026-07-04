@@ -85,19 +85,18 @@ export async function GET(req: NextRequest) {
          continue;
       }
 
-      // Check daily limit
+      // Check daily limit for auto applications
       const today = new Date()
       today.setHours(0,0,0,0)
       const { count: appliedToday } = await supabase
         .from('applications')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', profile.user_id)
+        .eq('application_method', 'auto')
+        .eq('status', 'applied_automatically')
         .gte('applied_at', today.toISOString())
       
-      if (appliedToday !== null && appliedToday >= DAILY_LIMIT) {
-        debugErrors.push(`User ${profile.user_id} hit daily limit of ${DAILY_LIMIT}`)
-        continue;
-      }
+      let localAppliedToday = appliedToday || 0;
 
       for (const job of applicableJobs) {
         // Ensure job exists in our jobs table
@@ -163,7 +162,7 @@ export async function GET(req: NextRequest) {
 
         // Routing Rule: >= 90 AND source is known to have auto-apply capacity (Greenhouse, Lever) -> Track A
         // Else -> Track B (pending_review)
-        const isAutoEligible = match.score >= 90 && (job.source === 'greenhouse' || job.source === 'lever')
+        let isAutoEligible = match.score >= 90 && (job.source === 'greenhouse' || job.source === 'lever')
         
         let status = isAutoEligible ? 'applied_automatically' : 'pending_review'
         let applicationMethod = isAutoEligible ? 'auto' : 'assisted'
@@ -171,15 +170,21 @@ export async function GET(req: NextRequest) {
         let coverLetter = match.carta || ''
 
         if (isAutoEligible) {
-          // Attempt auto apply
-          const applyResult = await sendAutoApplication(job, profile.cv_data, tailoredCv, coverLetter)
-          
-          if (!applyResult.success) {
-            // Fallback to ready_to_apply if auto-apply fails (e.g. no email found)
-            status = 'ready_to_apply'
-            debugErrors.push(`Auto-apply failed for job ${job.title}: ${applyResult.error}`)
+          if (localAppliedToday >= DAILY_LIMIT) {
+             status = 'ready_to_apply'
+             debugErrors.push(`User ${profile.user_id} reached auto-apply daily limit. Job ${job.title} set to ready_to_apply.`)
           } else {
-            newAutoApplications++
+            // Attempt auto apply
+            const applyResult = await sendAutoApplication(job, profile.cv_data, tailoredCv, coverLetter)
+            
+            if (!applyResult.success) {
+              // Fallback to ready_to_apply if auto-apply fails (e.g. no email found)
+              status = 'ready_to_apply'
+              debugErrors.push(`Auto-apply failed for job ${job.title}: ${applyResult.error}`)
+            } else {
+              newAutoApplications++
+              localAppliedToday++
+            }
           }
         }
 

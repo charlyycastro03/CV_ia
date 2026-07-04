@@ -20,7 +20,7 @@ export async function sendAutoApplication(
     const recruiterEmail = extractEmailFromJob(job)
     
     if (!recruiterEmail) {
-      throw new Error("No contact email found for this job")
+      throw new Error("AUTO_APPLY_NO_EMAIL: Job does not contain an email address (likely uses ATS form). Falling back to ready_to_apply.")
     }
 
     // 3. Enviar correo vía Resend
