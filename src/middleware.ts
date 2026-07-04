@@ -66,14 +66,14 @@ export async function middleware(request: NextRequest) {
     if (!user) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
-    // Verificamos si es admin en la tabla users
+    // Verificamos si es admin o reviewer en la tabla users
     const { data: userData } = await supabase
       .from('users')
       .select('role')
       .eq('id', user.id)
       .single()
       
-    if (userData?.role !== 'admin') {
+    if (userData?.role !== 'admin' && userData?.role !== 'reviewer') {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
   }

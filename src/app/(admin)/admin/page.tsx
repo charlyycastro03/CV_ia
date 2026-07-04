@@ -25,9 +25,9 @@ export default async function AdminDashboardPage() {
     .from('jobs')
     .select('*', { count: 'exact', head: true })
 
-  const { count: totalApplications } = await supabase
+  const { data: applications } = await supabase
     .from('applications')
-    .select('*', { count: 'exact', head: true })
+    .select('id, status, application_method')
 
   const { count: autoApplied } = await supabase
     .from('applications')
@@ -41,6 +41,48 @@ export default async function AdminDashboardPage() {
         <p className="text-muted-foreground mt-2">
           Vista panorámica del rendimiento del SaaS.
         </p>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Aplicaciones Automáticas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {applications?.filter(a => a.application_method === 'auto').length || 0}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Aplicaciones Asistidas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {applications?.filter(a => a.application_method === 'assisted').length || 0}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Listas para enviar</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {applications?.filter(a => a.status === 'ready_to_apply' || a.status === 'applied_automatically').length || 0}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pendientes de Revisión (Humano)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {applications?.filter(a => a.status === 'pending_review' || a.status === 'needs_candidate_info').length || 0}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -88,7 +130,7 @@ export default async function AdminDashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-black text-primary">{autoApplied || 0}</div>
-              <p className="text-xs text-primary/80 mt-1">de {totalApplications || 0} evaluaciones totales</p>
+              <p className="text-xs text-primary/80 mt-1">de {applications?.length || 0} evaluaciones totales</p>
             </CardContent>
           </Card>
         </SlideIn>

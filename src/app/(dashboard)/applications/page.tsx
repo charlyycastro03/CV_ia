@@ -19,6 +19,7 @@ export default async function ApplicationsPage() {
     .select(`
       id,
       status,
+      application_method,
       applied_at,
       jobs (
         title,
@@ -36,7 +37,7 @@ export default async function ApplicationsPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Mis Aplicaciones</h1>
         <p className="text-muted-foreground mt-2">
-          Seguimiento de todos los empleos a los que has aplicado o que la IA aplicó por ti.
+          Seguimiento de todos los empleos a los que la IA aplicó por ti (Auto) o que están siendo gestionados por nuestro equipo (Asistido).
         </p>
       </div>
 
@@ -62,14 +63,22 @@ export default async function ApplicationsPage() {
                       {app.jobs?.company_name} • {app.jobs?.location}
                     </CardDescription>
                   </div>
-                  <div className="px-3 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-500">
-                    {app.status === 'applied' ? 'Aplicado' : app.status}
+                  <div className="flex flex-col items-end gap-2">
+                    <div className={`px-3 py-1 rounded-full text-xs font-medium ${app.application_method === 'auto' ? 'bg-indigo-500/10 text-indigo-500' : 'bg-purple-500/10 text-purple-500'}`}>
+                      {app.application_method === 'auto' ? 'Automático' : 'Asistido'}
+                    </div>
+                    <div className="px-3 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-500">
+                      {app.status === 'applied_automatically' || app.status === 'applied' || app.status === 'submitted_by_team' ? 'Aplicado' : 
+                       app.status === 'ready_to_apply' ? 'Listo para enviar' :
+                       app.status === 'pending_review' ? 'En revisión' :
+                       app.status === 'needs_candidate_info' ? 'Falta Info' : app.status}
+                    </div>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
-                  Aplicaste el {new Date(app.applied_at).toLocaleDateString()}
+                  Ingresado el {new Date(app.applied_at || app.created_at || new Date()).toLocaleDateString()}
                 </p>
               </CardContent>
             </Card>

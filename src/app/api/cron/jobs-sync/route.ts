@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { fetchRemoteJobs, filterJobsByLocation } from '@/lib/services/jobSearch'
+import { fetchGreenhouseJobs } from '@/lib/sources/greenhouse'
+import { fetchLeverJobs } from '@/lib/sources/lever'
+import { fetchAdzunaJobs } from '@/lib/sources/adzuna'
 import { calculateJobMatch } from '@/lib/services/jobMatcher'
+import { sendAutoApplication } from '@/lib/services/autoApply'
 
 // Using service role client to bypass RLS for background jobs
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -16,11 +20,37 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // 1. Fetch raw jobs from API
-    const rawJobs = await fetchRemoteJobs(15) // Limit to 15 for API safety during dev
+    const rawRemotive = await fetchRemoteJobs(10)
+    // Map remotive to standard internal format
+    const remotiveJobs = rawRemotive.map((j: any) => ({
+      source: 'remotive',
+      external_id: String(j.id),
+      company_name: j.company_name,
+      title: j.title,
+      location: j.candidate_required_location,
+      description: j.description,
+      url: j.url,
+      raw: j
+    }))
+
+    // Fetch from other sources (using some mock target sites/queries for demo purposes)
+    const rawGreenhouse = await fetchGreenhouseJobs('stripe')
+    const greenhouseJobs = rawGreenhouse.map((j: any) => ({ ...j, company_name: j.company, url: j.apply_url }))
+
+    const rawLever = await fetchLeverJobs('netflix')
+    const leverJobs = rawLever.map((j: any) => ({ ...j, company_name: j.company, url: j.apply_url }))
+
+    const rawAdzuna = await fetchAdzunaJobs('software engineer', 'us')
+    const adzunaJobs = rawAdzuna.map((j: any) => ({ ...j, company_name: j.company, url: j.apply_url }))
+
+    const allRawJobs = [...remotiveJobs, ...greenhouseJobs, ...leverJobs, ...adzunaJobs]
+    
     let newAutoApplications = 0
     let totalEvaluated = 0
     let debugErrors: string[] = []
+
+    // Daily limit config
+    const DAILY_LIMIT = 10;
 
     // 2. Fetch all users with CV data
     const { data: profiles, error: profileErr } = await supabase
@@ -38,10 +68,32 @@ export async function GET(req: NextRequest) {
 
     for (const profile of profiles) {
       const userLocation = profile.cv_data.location || 'worldwide'
-      const applicableJobs = filterJobsByLocation(rawJobs, userLocation)
+      
+      // Filter location for remotive specifically, others are already globally queried or US specific
+      const applicableJobs = allRawJobs.filter((job: any) => {
+        if (job.source === 'remotive') {
+          return filterJobsByLocation([job as any], userLocation).length > 0;
+        }
+        return true;
+      })
       
       if (applicableJobs.length === 0) {
          debugErrors.push(`No applicable jobs for location: ${userLocation}`)
+         continue;
+      }
+
+      // Check daily limit
+      const today = new Date()
+      today.setHours(0,0,0,0)
+      const { count: appliedToday } = await supabase
+        .from('applications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', profile.user_id)
+        .gte('applied_at', today.toISOString())
+      
+      if (appliedToday !== null && appliedToday >= DAILY_LIMIT) {
+        debugErrors.push(`User ${profile.user_id} hit daily limit of ${DAILY_LIMIT}`)
+        continue;
       }
 
       for (const job of applicableJobs) {
@@ -49,7 +101,8 @@ export async function GET(req: NextRequest) {
         const { data: existingJob, error: jobErr } = await supabase
           .from('jobs')
           .select('id')
-          .eq('external_id', job.id.toString())
+          .eq('external_id', job.external_id)
+          .eq('source', job.source)
           .maybeSingle()
 
         if (jobErr) debugErrors.push('Error checking existing job: ' + jobErr.message)
@@ -59,10 +112,11 @@ export async function GET(req: NextRequest) {
           const { data: insertedJob, error: insertJobErr } = await supabase.from('jobs').insert({
             title: job.title,
             company_name: job.company_name,
-            location: job.candidate_required_location,
+            location: job.location,
             description: job.description,
-            external_id: job.id.toString(),
-            url: job.url
+            external_id: job.external_id,
+            url: job.url,
+            source: job.source
           }).select('id').maybeSingle()
           
           if (insertJobErr) {
@@ -97,23 +151,55 @@ export async function GET(req: NextRequest) {
         // Evaluate match
         const match = await calculateJobMatch(profile.cv_data, job)
         totalEvaluated++
+        
+        await supabase.from('application_logs').insert({
+          application_id: null,
+          status: 'evaluated',
+          notes: `Evaluated job ${job.title} for user ${profile.user_id}. Score: ${match.score}`
+        })
 
-        // Determine status: >90% -> Ready to apply, otherwise -> Review
-        const status = match.score >= 90 ? 'ready_to_apply' : 'pending_review'
+        // Routing Rule: >= 90 AND source is known to have auto-apply capacity (Greenhouse, Lever) -> Track A
+        // Else -> Track B (pending_review)
+        const isAutoEligible = match.score >= 90 && (job.source === 'greenhouse' || job.source === 'lever')
+        
+        let status = isAutoEligible ? 'applied_automatically' : 'pending_review'
+        let applicationMethod = isAutoEligible ? 'auto' : 'assisted'
+        let tailoredCv = match.cv_adaptado || profile.cv_data // Assume calculateJobMatch returns this now (will fix next)
+        let coverLetter = match.carta || ''
 
-        const { error: insertAppErr } = await supabase.from('applications').insert({
+        if (isAutoEligible) {
+          // Attempt auto apply
+          const applyResult = await sendAutoApplication(job, profile.cv_data, tailoredCv, coverLetter)
+          
+          if (!applyResult.success) {
+            // Fallback to ready_to_apply if auto-apply fails (e.g. no email found)
+            status = 'ready_to_apply'
+            debugErrors.push(`Auto-apply failed for job ${job.title}: ${applyResult.error}`)
+          } else {
+            newAutoApplications++
+          }
+        }
+
+        const { data: appData, error: insertAppErr } = await supabase.from('applications').insert({
           user_id: profile.user_id,
           job_id: dbJobId,
           status: status,
+          application_method: applicationMethod,
           match_score: match.score,
-          match_details: match
-        })
+          match_details: match,
+          applied_at: new Date().toISOString()
+        }).select('id').maybeSingle()
 
         if (insertAppErr) {
           debugErrors.push('Error inserting application (RLS?): ' + insertAppErr.message)
           console.error('Error inserting application:', insertAppErr.message)
-        } else if (status === 'ready_to_apply') {
-          newAutoApplications++
+        } else if (appData) {
+          // Log insertion
+          await supabase.from('application_logs').insert({
+            application_id: appData.id,
+            status: status,
+            notes: `Application routed to ${applicationMethod} with status ${status}.`
+          })
         }
       }
     }

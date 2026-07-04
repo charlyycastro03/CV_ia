@@ -6,6 +6,8 @@ export interface MatchResult {
   pros: string[]
   cons: string[]
   summary: string
+  cv_adaptado?: any
+  carta?: string
 }
 
 export async function calculateJobMatch(cvData: any, job: RemotiveJob): Promise<MatchResult> {
@@ -31,18 +33,24 @@ export async function calculateJobMatch(cvData: any, job: RemotiveJob): Promise<
       Descripción: ${cleanDescription}
 
       TAREA:
-      Evalúa qué tan compatible es el candidato con la vacante.
+      1. Evalúa qué tan compatible es el candidato con la vacante.
+      2. Adapta el CV del candidato resaltando SOLO la experiencia relevante para esta vacante, reescribiendo o reordenando logros (SIN inventar experiencia ni habilidades que no estén en el perfil original).
+      3. Escribe una carta de presentación breve (150 palabras) dirigida a la empresa.
+
       Debes devolver un JSON válido con la siguiente estructura estricta:
       {
         "score": 85, 
         "pros": ["Tiene experiencia en React", "Cumple con los años requeridos"],
         "cons": ["No menciona experiencia en AWS"],
-        "summary": "El candidato es un excelente fit técnico pero carece de algo de infraestructura."
+        "summary": "El candidato es un excelente fit técnico pero carece de algo de infraestructura.",
+        "cv_adaptado": { ... mismo esquema del CV original, optimizado ... },
+        "carta": "Estimado equipo de..."
       }
 
       REGLAS:
       - "score" debe ser un número entero entre 0 y 100. Sé objetivo.
       - "pros" y "cons" deben ser arreglos de strings cortos (máx 3 cada uno).
+      - "cv_adaptado" debe mantener la estructura original pero con textos optimizados con palabras clave de la vacante.
       - Responde SOLO con el objeto JSON, nada de texto markdown antes ni después.
     `
 
