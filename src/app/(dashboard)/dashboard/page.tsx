@@ -94,7 +94,7 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-4xl font-black text-green-500">{autoApplied}</div>
-              <p className="text-xs text-muted-foreground mt-1">con >90% de coincidencia</p>
+              <p className="text-xs text-muted-foreground mt-1">con &gt;90% de coincidencia</p>
             </CardContent>
           </Card>
         </SlideIn>
