@@ -20,20 +20,29 @@ export async function GET(req: NextRequest) {
     const rawJobs = await fetchRemoteJobs(15) // Limit to 15 for API safety during dev
     let newAutoApplications = 0
     let totalEvaluated = 0
+    let debugErrors: string[] = []
 
     // 2. Fetch all users with CV data
-    const { data: profiles } = await supabase
+    const { data: profiles, error: profileErr } = await supabase
       .from('profiles')
       .select('user_id, cv_data')
       .not('cv_data', 'is', null)
 
+    if (profileErr) {
+      debugErrors.push('Error fetching profiles: ' + profileErr.message)
+    }
+
     if (!profiles || profiles.length === 0) {
-      return NextResponse.json({ message: 'No profiles to process' })
+      return NextResponse.json({ message: 'No profiles to process', errors: debugErrors })
     }
 
     for (const profile of profiles) {
       const userLocation = profile.cv_data.location || 'worldwide'
       const applicableJobs = filterJobsByLocation(rawJobs, userLocation)
+      
+      if (applicableJobs.length === 0) {
+         debugErrors.push(`No applicable jobs for location: ${userLocation}`)
+      }
 
       for (const job of applicableJobs) {
         // Ensure job exists in our jobs table
@@ -42,6 +51,8 @@ export async function GET(req: NextRequest) {
           .select('id')
           .eq('external_id', job.id.toString())
           .maybeSingle()
+
+        if (jobErr) debugErrors.push('Error checking existing job: ' + jobErr.message)
 
         let dbJobId
         if (!existingJob) {
@@ -55,6 +66,7 @@ export async function GET(req: NextRequest) {
           }).select('id').maybeSingle()
           
           if (insertJobErr) {
+            debugErrors.push('Error inserting job (RLS?): ' + insertJobErr.message)
             console.error('Error inserting job:', insertJobErr.message)
           }
           if (insertedJob) dbJobId = insertedJob.id
@@ -63,6 +75,7 @@ export async function GET(req: NextRequest) {
         }
 
         if (!dbJobId) {
+          debugErrors.push('Skipping job evaluation because dbJobId could not be obtained')
           console.error('Skipping job evaluation because dbJobId could not be obtained (RLS issue?)')
           continue
         }
@@ -74,6 +87,8 @@ export async function GET(req: NextRequest) {
           .eq('user_id', profile.user_id)
           .eq('job_id', dbJobId)
           .maybeSingle()
+
+        if (appErr) debugErrors.push('Error checking existing app: ' + appErr.message)
 
         if (existingApp) {
           continue; // Already processed this job for this user
@@ -95,11 +110,10 @@ export async function GET(req: NextRequest) {
         })
 
         if (insertAppErr) {
+          debugErrors.push('Error inserting application (RLS?): ' + insertAppErr.message)
           console.error('Error inserting application:', insertAppErr.message)
         } else if (status === 'applied_automatically') {
           newAutoApplications++
-          // Aquí se integraría lógica para enviar email al usuario (ej: Resend) 
-          // indicándole que se ha aplicado automáticamente a esta vacante.
         }
       }
     }
@@ -108,7 +122,8 @@ export async function GET(req: NextRequest) {
       success: true, 
       message: 'Cron ejecutado con éxito',
       totalEvaluated,
-      newAutoApplications
+      newAutoApplications,
+      errors: debugErrors
     })
 
   } catch (error: any) {
