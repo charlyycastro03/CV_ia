@@ -4,9 +4,9 @@ export function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   
-  // Clean aggressively to remove any accidental quotes, single quotes or spaces
-  const cleanUrl = (url || '').replace(/['"]/g, '').trim()
-  const cleanKey = (key || '').replace(/['"]/g, '').trim()
+  // Clean aggressively to remove any accidental quotes, single quotes, newlines or spaces anywhere
+  const cleanUrl = (url || '').replace(/['"\s]+/g, '')
+  const cleanKey = (key || '').replace(/['"\s]+/g, '')
 
   console.log("DEBUG ENV:", { 
     urlExists: !!url, 
