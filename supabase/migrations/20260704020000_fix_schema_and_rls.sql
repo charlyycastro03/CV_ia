@@ -49,9 +49,17 @@ END $$;
 -- Habilitar RLS en todas las tablas activas
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE applications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE application_logs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE test_results ENABLE ROW LEVEL SECURITY;
 ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'application_logs') THEN
+        EXECUTE 'ALTER TABLE application_logs ENABLE ROW LEVEL SECURITY';
+    END IF;
+    IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'test_results') THEN
+        EXECUTE 'ALTER TABLE test_results ENABLE ROW LEVEL SECURITY';
+    END IF;
+END $$;
 
 -- Políticas para Profiles
 DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
