@@ -12,6 +12,8 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY! // fallback for local dev if missing
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+export const maxDuration = 60; // Max execution time for the cron job (in seconds)
+
 export async function GET(req: NextRequest) {
   // Simple auth for cron (in production, use VERCEL_CRON_SECRET)
   const authHeader = req.headers.get('authorization')
@@ -20,7 +22,28 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const rawRemotive = await fetchRemoteJobs(10)
+    // 1. Fetch from all sources in parallel
+    const [
+      remotiveRes,
+      greenhouseDiscordRes,
+      greenhouseTwitchRes,
+      leverRes,
+      adzunaRes
+    ] = await Promise.allSettled([
+      fetchRemoteJobs(10),
+      fetchGreenhouseJobs('discord'),
+      fetchGreenhouseJobs('twitch'),
+      fetchLeverJobs('lever'),
+      fetchAdzunaJobs('software engineer', 'us')
+    ])
+
+    // Extraemos resultados, manejando posibles rechazos
+    const rawRemotive = remotiveRes.status === 'fulfilled' ? remotiveRes.value : []
+    const rawGreenhouse = greenhouseDiscordRes.status === 'fulfilled' ? greenhouseDiscordRes.value : []
+    const rawGreenhouse2 = greenhouseTwitchRes.status === 'fulfilled' ? greenhouseTwitchRes.value : []
+    const rawLever = leverRes.status === 'fulfilled' ? leverRes.value : []
+    const rawAdzuna = adzunaRes.status === 'fulfilled' ? adzunaRes.value : []
+
     // Map remotive to standard internal format
     const remotiveJobs = rawRemotive.map((j: any) => ({
       source: 'remotive',
@@ -33,17 +56,9 @@ export async function GET(req: NextRequest) {
       raw: j
     }))
 
-    // Fetch from other sources (using some mock target sites/queries for demo purposes)
-    const rawGreenhouse = await fetchGreenhouseJobs('discord') // discord tiene empleos en greenhouse
     const greenhouseJobs = rawGreenhouse.map((j: any) => ({ ...j, company_name: j.company, url: j.apply_url }))
-
-    const rawGreenhouse2 = await fetchGreenhouseJobs('twitch') // twitch tiene empleos en greenhouse
     const greenhouseJobs2 = rawGreenhouse2.map((j: any) => ({ ...j, company_name: j.company, url: j.apply_url }))
-
-    const rawLever = await fetchLeverJobs('lever') // lever usa lever
     const leverJobs = rawLever.map((j: any) => ({ ...j, company_name: j.company, url: j.apply_url }))
-
-    const rawAdzuna = await fetchAdzunaJobs('software engineer', 'us')
     const adzunaJobs = rawAdzuna.map((j: any) => ({ ...j, company_name: j.company, url: j.apply_url }))
 
     const allRawJobs = [...remotiveJobs, ...greenhouseJobs, ...greenhouseJobs2, ...leverJobs, ...adzunaJobs]
@@ -55,11 +70,16 @@ export async function GET(req: NextRequest) {
     // Daily limit config
     const DAILY_LIMIT = 10;
 
-    // 2. Fetch all users with CV data
+    const MAX_PROFILES_PER_RUN = 5;
+    const MAX_EVALUATIONS_PER_RUN = 30;
+
+    // 2. Fetch all users with CV data, order by least recently matched
     const { data: profiles, error: profileErr } = await supabase
       .from('profiles')
-      .select('user_id, cv_data')
+      .select('user_id, cv_data, last_matched_at')
       .not('cv_data', 'is', null)
+      .order('last_matched_at', { ascending: true, nullsFirst: true })
+      .limit(MAX_PROFILES_PER_RUN)
 
     if (profileErr) {
       debugErrors.push('Error fetching profiles: ' + profileErr.message)
@@ -69,7 +89,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: 'No profiles to process', errors: debugErrors })
     }
 
+    let profilesProcessed: string[] = []
+
     for (const profile of profiles) {
+      if (totalEvaluated >= MAX_EVALUATIONS_PER_RUN) {
+         debugErrors.push(`Reached global limit of ${MAX_EVALUATIONS_PER_RUN} evaluations this run. Stopping early.`)
+         break;
+      }
+      
       const userLocation = profile.cv_data.location || 'worldwide'
       
       // Filter location for remotive specifically, others are already globally queried or US specific
@@ -99,6 +126,11 @@ export async function GET(req: NextRequest) {
       let localAppliedToday = appliedToday || 0;
 
       for (const job of applicableJobs) {
+        if (totalEvaluated >= MAX_EVALUATIONS_PER_RUN) {
+           debugErrors.push(`Reached global limit of ${MAX_EVALUATIONS_PER_RUN} evaluations this run inside loop.`)
+           break;
+        }
+
         // Ensure job exists in our jobs table
         const { data: existingJob, error: jobErr } = await supabase
           .from('jobs')
@@ -209,15 +241,29 @@ export async function GET(req: NextRequest) {
             notes: `Application routed to ${applicationMethod} with status ${status}.`
           })
         }
+      } // end job loop
+      
+      profilesProcessed.push(profile.user_id)
+    } // end profile loop
+
+    // 3. Update last_matched_at for processed profiles
+    if (profilesProcessed.length > 0) {
+      const { error: updateErr } = await supabase
+        .from('profiles')
+        .update({ last_matched_at: new Date().toISOString() })
+        .in('user_id', profilesProcessed)
+        
+      if (updateErr) {
+        debugErrors.push('Error updating last_matched_at: ' + updateErr.message)
       }
     }
 
     return NextResponse.json({ 
-      success: true, 
-      message: 'Cron ejecutado con éxito',
-      totalEvaluated,
+      success: true,
+      totalEvaluated, 
       newAutoApplications,
-      errors: debugErrors
+      profilesProcessed: profilesProcessed.length,
+      errors: debugErrors 
     })
 
   } catch (error: any) {
