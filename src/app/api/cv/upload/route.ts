@@ -110,17 +110,19 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (profile) {
-      await supabase.from('profiles').update({
+      const { error: updateError } = await supabase.from('profiles').update({
         cv_url: publicUrl,
         cv_data: cvData,
         updated_at: new Date().toISOString()
       }).eq('user_id', user.id)
+      if (updateError) throw new Error('Error al actualizar el perfil en BD: ' + updateError.message)
     } else {
-      await supabase.from('profiles').insert({
+      const { error: insertError } = await supabase.from('profiles').insert({
         user_id: user.id,
         cv_url: publicUrl,
         cv_data: cvData
       })
+      if (insertError) throw new Error('Error al guardar el perfil en BD: ' + insertError.message)
     }
 
     return NextResponse.json({ success: true, data: cvData, cv_url: publicUrl })
