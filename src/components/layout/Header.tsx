@@ -1,28 +1,68 @@
 "use client"
 
-import { ThemeToggle } from "@/components/theme-toggle"
-import { Bell } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { User } from "@supabase/supabase-js"
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { Moon, Sun, Settings, LogOut } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 interface HeaderProps {
-  user: User | null
+  user: any
 }
 
 export function Header({ user }: HeaderProps) {
-  return (
-    <header className="h-16 flex items-center justify-between md:justify-end px-4 md:px-8 border-b border-border bg-background">
-      {/* Mobile Title (only visible on small screens) */}
-      <div className="md:hidden">
-        <span className="text-lg font-bold text-primary">CV Automation</span>
-      </div>
+  const [theme, setTheme] = useState<'light' | 'dark'>('light')
 
-      <div className="flex items-center space-x-3">
-        <ThemeToggle />
-        <Button variant="outline" size="icon" className="rounded-full w-9 h-9 relative">
-          <Bell className="h-[1.2rem] w-[1.2rem]" />
-          <span className="absolute top-0 right-0 w-2 h-2 bg-primary rounded-full"></span>
-        </Button>
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' || 'light'
+    setTheme(savedTheme)
+  }, [])
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light'
+    setTheme(newTheme)
+    localStorage.setItem('theme', newTheme)
+    document.documentElement.classList.toggle('dark')
+  }
+
+  return (
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container flex h-14 items-center px-4">
+        <div className="mr-4 hidden md:flex">
+          <Link href="/dashboard" className="mr-6 flex items-center space-x-2">
+            <span className="font-bold text-primary text-lg">CV IA</span>
+          </Link>
+        </div>
+        
+        <div className="flex flex-1 items-center justify-end space-x-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleTheme}
+            className="relative"
+          >
+            {theme === 'light' ? (
+              <Moon className="h-5 w-5" />
+            ) : (
+              <Sun className="h-5 w-5" />
+            )}
+            <span className="sr-only">Cambiar tema</span>
+          </Button>
+
+          <Link href="/settings">
+            <Button variant="ghost" size="icon">
+              <Settings className="h-5 w-5" />
+              <span className="sr-only">Configuración</span>
+            </Button>
+          </Link>
+
+          {user && (
+            <div className="flex items-center space-x-2 ml-2">
+              <span className="text-sm text-muted-foreground hidden md:inline">
+                {user.email}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   )

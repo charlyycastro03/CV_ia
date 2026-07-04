@@ -49,7 +49,6 @@ export async function GET(req: NextRequest) {
             title: job.title,
             company: job.company_name,
             location: job.candidate_required_location,
-            salary: job.salary,
             description: job.description,
             external_id: job.id.toString(),
             url: job.url

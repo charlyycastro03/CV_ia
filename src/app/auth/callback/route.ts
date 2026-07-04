@@ -5,7 +5,6 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  // if "next" is in param, use it as the redirect URL
   const next = searchParams.get('next') ?? '/dashboard'
 
   if (code) {
@@ -27,12 +26,22 @@ export async function GET(request: Request) {
         },
       }
     )
+
     const { error } = await supabase.auth.exchangeCodeForSession(code)
+    
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`)
+      // Verificar si el email está confirmado
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (user?.email_confirmed_at) {
+        // Email ya confirmado, ir al dashboard
+        return NextResponse.redirect(`${origin}${next}`)
+      } else {
+        // Email no confirmado, mostrar página de verificación
+        return NextResponse.redirect(`${origin}/auth/verify?email=${encodeURIComponent(user?.email || '')}`)
+      }
     }
   }
 
-  // return the user to an error page with instructions
-  return NextResponse.redirect(`${origin}/login?error=true`)
+  return NextResponse.redirect(`${origin}/auth/login?error=auth_failed`)
 }

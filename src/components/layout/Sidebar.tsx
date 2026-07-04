@@ -16,7 +16,7 @@ export function Sidebar({ user }: SidebarProps) {
     { name: "Inicio", href: "/dashboard", icon: Home },
     { name: "Buscar Empleos", href: "/jobs", icon: Search },
     { name: "Mis Aplicaciones", href: "/applications", icon: Briefcase },
-    { name: "Mi Perfil", href: "/profile", icon: UserIcon },
+    { name: "Mi CV", href: "/cv-upload", icon: UserIcon },
   ]
 
   return (

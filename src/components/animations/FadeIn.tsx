@@ -1,24 +1,37 @@
 "use client"
 
-import { motion } from "framer-motion"
-import { ReactNode } from "react"
+import { useEffect, useState } from 'react'
 
 interface FadeInProps {
-  children: ReactNode
+  children: React.ReactNode
   delay?: number
-  duration?: number
-  className?: string
+  direction?: 'up' | 'down' | 'left' | 'right'
 }
 
-export function FadeIn({ children, delay = 0, duration = 0.4, className = "" }: FadeInProps) {
+export function FadeIn({ children, delay = 0, direction = 'up' }: FadeInProps) {
+  const [isVisible, setIsVisible] = useState(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsVisible(true), delay)
+    return () => clearTimeout(timer)
+  }, [delay])
+
+  const directionClasses = {
+    up: 'translate-y-4',
+    down: '-translate-y-4',
+    left: 'translate-x-4',
+    right: '-translate-x-4'
+  }
+
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration, delay, ease: "easeOut" }}
-      className={className}
+    <div
+      className={`transition-all duration-500 ease-out ${
+        isVisible 
+          ? 'opacity-100 translate-x-0 translate-y-0' 
+          : `opacity-0 ${directionClasses[direction]}`
+      }`}
     >
       {children}
-    </motion.div>
+    </div>
   )
 }
