@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 
     // 2. Parse with Gemini 1.5 (Native PDF support)
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
 
     const buffer = await file.arrayBuffer()
     const base64Data = Buffer.from(buffer).toString('base64')
