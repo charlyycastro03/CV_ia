@@ -14,7 +14,7 @@ export default async function ApplicationsPage() {
   }
 
   // Fetch applications
-  const { data: applications } = await supabase
+  const { data: applications, error } = await supabase
     .from('applications')
     .select(`
       id,
@@ -25,12 +25,17 @@ export default async function ApplicationsPage() {
         title,
         company_name,
         location,
-        salary,
-        type
+        salary_min,
+        salary_max,
+        job_type
       )
     `)
     .eq('user_id', user.id)
     .order('applied_at', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching applications:', error.message)
+  }
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6">
@@ -41,7 +46,16 @@ export default async function ApplicationsPage() {
         </p>
       </div>
 
-      {!applications || applications.length === 0 ? (
+      {error ? (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center text-red-700">
+            <h3 className="text-xl font-bold mb-2">Error al cargar aplicaciones</h3>
+            <p className="max-w-sm mb-6">
+              Hubo un problema recuperando tus datos. Por favor, intenta recargar la página en unos momentos.
+            </p>
+          </CardContent>
+        </Card>
+      ) : !applications || applications.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
             <Briefcase className="h-12 w-12 text-muted-foreground mb-4" />
@@ -61,6 +75,13 @@ export default async function ApplicationsPage() {
                     <CardTitle className="text-xl">{app.jobs?.title}</CardTitle>
                     <CardDescription className="text-base mt-1">
                       {app.jobs?.company_name} • {app.jobs?.location}
+                      {(app.jobs?.salary_min || app.jobs?.salary_max) && (
+                        <span className="block text-sm mt-1">
+                          💰 {app.jobs.salary_min ? `$${app.jobs.salary_min.toLocaleString()}` : ''}
+                          {app.jobs.salary_min && app.jobs.salary_max ? ' - ' : ''}
+                          {app.jobs.salary_max ? `$${app.jobs.salary_max.toLocaleString()}` : ''}
+                        </span>
+                      )}
                     </CardDescription>
                   </div>
                   <div className="flex flex-col items-end gap-2">
