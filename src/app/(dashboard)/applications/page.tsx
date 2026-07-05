@@ -27,7 +27,7 @@ export default async function ApplicationsPage() {
         location,
         salary_min,
         salary_max,
-        job_type
+        type
       )
     `)
     .eq('user_id', user.id)
