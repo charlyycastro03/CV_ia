@@ -13,7 +13,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState({
     cvUploaded: false,
     applications: 0,
-    matches: 0
+    evaluated: 0
   })
 
   useEffect(() => {
@@ -34,17 +34,17 @@ export default function DashboardPage() {
           .from('applications')
           .select('*', { count: 'exact', head: true })
           .eq('user_id', user.id)
+          .neq('status', 'pending_review')
           
-        const { count: matchesCount } = await supabase
+        const { count: evaluatedCount } = await supabase
           .from('applications')
           .select('*', { count: 'exact', head: true })
           .eq('user_id', user.id)
-          .gte('match_score', 80)
 
         setStats({
           cvUploaded: !!profile,
           applications: appsCount || 0,
-          matches: matchesCount || 0
+          evaluated: evaluatedCount || 0
         })
       }
     }
@@ -105,20 +105,20 @@ export default function DashboardPage() {
             <CardContent>
               <div className="text-2xl font-bold">{stats.applications}</div>
               <p className="text-xs text-muted-foreground">
-                Empleos a los que has aplicado
+                Empleos listos o enviados
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Matches</CardTitle>
+              <CardTitle className="text-sm font-medium">Evaluados por IA</CardTitle>
               <TrendingUp className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.matches}</div>
+              <div className="text-2xl font-bold">{stats.evaluated}</div>
               <p className="text-xs text-muted-foreground">
-                Empleos con más de 80% de match
+                Empleos rastreados y calificados
               </p>
             </CardContent>
           </Card>
@@ -147,22 +147,22 @@ export default function DashboardPage() {
 
               {/* Step 2 */}
               <div className="relative pl-8 md:pl-0 md:flex-1">
-                <div className={`absolute -left-1.5 md:left-1/2 md:-translate-x-1/2 md:-top-5.5 w-3 h-3 rounded-full border-2 ${stats.applications > 0 ? 'bg-primary border-primary' : 'bg-background border-muted-foreground'} md:-mt-6`}></div>
+                <div className={`absolute -left-1.5 md:left-1/2 md:-translate-x-1/2 md:-top-5.5 w-3 h-3 rounded-full border-2 ${stats.evaluated > 0 ? 'bg-primary border-primary' : 'bg-background border-muted-foreground'} md:-mt-6`}></div>
                 <div className="md:text-center md:px-2">
-                  <h4 className={`font-semibold ${stats.applications > 0 ? 'text-primary' : 'text-muted-foreground'}`}>2. Búsqueda de IA</h4>
+                  <h4 className={`font-semibold ${stats.evaluated > 0 ? 'text-primary' : 'text-muted-foreground'}`}>2. Búsqueda de IA</h4>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {stats.applications > 0 ? 'La IA ya está evaluando vacantes para ti.' : 'Ve a "Buscar Empleos" para iniciar el rastreo.'}
+                    {stats.evaluated > 0 ? 'La IA ya está evaluando vacantes para ti.' : 'Ve a "Buscar Empleos" para iniciar el rastreo.'}
                   </p>
                 </div>
               </div>
 
               {/* Step 3 */}
               <div className="relative pl-8 md:pl-0 md:flex-1">
-                <div className={`absolute -left-1.5 md:left-1/2 md:-translate-x-1/2 md:-top-5.5 w-3 h-3 rounded-full border-2 ${stats.matches > 0 ? 'bg-primary border-primary' : 'bg-background border-muted-foreground'} md:-mt-6`}></div>
+                <div className={`absolute -left-1.5 md:left-1/2 md:-translate-x-1/2 md:-top-5.5 w-3 h-3 rounded-full border-2 ${stats.applications > 0 ? 'bg-primary border-primary' : 'bg-background border-muted-foreground'} md:-mt-6`}></div>
                 <div className="md:text-center md:px-2">
-                  <h4 className={`font-semibold ${stats.matches > 0 ? 'text-primary' : 'text-muted-foreground'}`}>3. Aplicaciones Listas</h4>
+                  <h4 className={`font-semibold ${stats.applications > 0 ? 'text-primary' : 'text-muted-foreground'}`}>3. Aplicaciones Listas</h4>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {stats.matches > 0 ? 'Tienes empleos guardados en Mis Aplicaciones.' : 'Guarda los mejores empleos recomendados.'}
+                    {stats.applications > 0 ? 'Tienes empleos guardados en Mis Aplicaciones.' : 'Guarda los mejores empleos recomendados.'}
                   </p>
                 </div>
               </div>
