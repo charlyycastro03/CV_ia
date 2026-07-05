@@ -32,6 +32,7 @@ export default async function ApplicationsPage() {
       )
     `)
     .eq('user_id', user.id)
+    .neq('status', 'pending_review')
     .order('applied_at', { ascending: false })
 
   if (error) {

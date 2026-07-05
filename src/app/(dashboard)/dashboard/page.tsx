@@ -124,44 +124,69 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Acciones Rápidas */}
-        <Card>
+        {/* Marcapasos (Progress Tracker) */}
+        <Card className="mt-8">
           <CardHeader>
-            <CardTitle>Acciones Rápidas</CardTitle>
+            <CardTitle>Tu Progreso</CardTitle>
             <CardDescription>
-              Accede a las funciones principales de la plataforma
+              Sigue estos pasos para maximizar tus oportunidades
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2">
-            <Link href="/applications" className="group">
-              <Card className="border-primary/20 hover:border-primary/50 transition-colors">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <Briefcase className="h-8 w-8 text-primary" />
-                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                  </div>
-                  <CardTitle className="mt-4">Mis Aplicaciones</CardTitle>
-                  <CardDescription>
-                    Revisa y da seguimiento a los empleos a los que has aplicado
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-            </Link>
+          <CardContent>
+            <div className="relative border-l border-muted-foreground/20 ml-3 md:ml-0 md:border-l-0 md:border-t md:flex md:justify-between md:pt-4 space-y-8 md:space-y-0 pb-4">
+              {/* Step 1 */}
+              <div className="relative pl-8 md:pl-0 md:flex-1">
+                <div className={`absolute -left-1.5 md:left-1/2 md:-translate-x-1/2 md:-top-5.5 w-3 h-3 rounded-full border-2 ${stats.cvUploaded ? 'bg-primary border-primary' : 'bg-background border-muted-foreground'} md:-mt-6`}></div>
+                <div className="md:text-center md:px-2">
+                  <h4 className={`font-semibold ${stats.cvUploaded ? 'text-primary' : 'text-muted-foreground'}`}>1. Perfil Completado</h4>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {stats.cvUploaded ? 'CV cargado exitosamente.' : 'Sube tu CV para empezar.'}
+                  </p>
+                </div>
+              </div>
 
-            <Link href="/settings" className="group">
-              <Card className="border-primary/20 hover:border-primary/50 transition-colors">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <Settings className="h-8 w-8 text-primary" />
-                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                  </div>
-                  <CardTitle className="mt-4">Configuración</CardTitle>
-                  <CardDescription>
-                    Personaliza tu experiencia y preferencias
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-            </Link>
+              {/* Step 2 */}
+              <div className="relative pl-8 md:pl-0 md:flex-1">
+                <div className={`absolute -left-1.5 md:left-1/2 md:-translate-x-1/2 md:-top-5.5 w-3 h-3 rounded-full border-2 ${stats.applications > 0 ? 'bg-primary border-primary' : 'bg-background border-muted-foreground'} md:-mt-6`}></div>
+                <div className="md:text-center md:px-2">
+                  <h4 className={`font-semibold ${stats.applications > 0 ? 'text-primary' : 'text-muted-foreground'}`}>2. Búsqueda de IA</h4>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {stats.applications > 0 ? 'La IA ya está evaluando vacantes para ti.' : 'Ve a "Buscar Empleos" para iniciar el rastreo.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Step 3 */}
+              <div className="relative pl-8 md:pl-0 md:flex-1">
+                <div className={`absolute -left-1.5 md:left-1/2 md:-translate-x-1/2 md:-top-5.5 w-3 h-3 rounded-full border-2 ${stats.matches > 0 ? 'bg-primary border-primary' : 'bg-background border-muted-foreground'} md:-mt-6`}></div>
+                <div className="md:text-center md:px-2">
+                  <h4 className={`font-semibold ${stats.matches > 0 ? 'text-primary' : 'text-muted-foreground'}`}>3. Aplicaciones Listas</h4>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {stats.matches > 0 ? 'Tienes empleos guardados en Mis Aplicaciones.' : 'Guarda los mejores empleos recomendados.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Step 4 */}
+              <div className="relative pl-8 md:pl-0 md:flex-1">
+                <div className="absolute -left-1.5 md:left-1/2 md:-translate-x-1/2 md:-top-5.5 w-3 h-3 rounded-full border-2 bg-background border-muted-foreground md:-mt-6"></div>
+                <div className="md:text-center md:px-2">
+                  <h4 className="font-semibold text-muted-foreground">4. Postulaciones Enviadas</h4>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Aplica a los empleos listos y registra tus entrevistas.
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-8 flex justify-center gap-4">
+              <Button asChild variant="outline">
+                <Link href="/jobs">Ver Recomendados</Link>
+              </Button>
+              <Button asChild>
+                <Link href="/applications">Mis Aplicaciones</Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </FadeIn>

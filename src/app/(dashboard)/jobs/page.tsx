@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { JobCard } from '@/components/jobs/JobCard'
-import { Sparkles, Briefcase } from 'lucide-react'
+import { Briefcase } from 'lucide-react'
+import { SyncJobsButton } from '@/components/jobs/SyncJobsButton'
+import { JobsList } from '@/components/jobs/JobsList'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,6 +20,7 @@ export default async function JobsPage() {
       jobs (*)
     `)
     .eq('user_id', user.id)
+    .eq('status', 'pending_review')
     .order('match_score', { ascending: false })
 
   return (
@@ -31,13 +33,7 @@ export default async function JobsPage() {
           </p>
         </div>
         
-        {/* We can place a manual trigger for the cron job here just for testing in the MVP */}
-        <form action="/api/cron/jobs-sync" method="GET">
-          <button type="submit" className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2">
-            <Sparkles className="w-4 h-4 mr-2" />
-            Buscar Nuevas Ofertas
-          </button>
-        </form>
+        <SyncJobsButton />
       </div>
 
       {(!applications || applications.length === 0) ? (
@@ -51,15 +47,7 @@ export default async function JobsPage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-6">
-          {applications.map((app, index) => (
-            <JobCard 
-              key={app.id} 
-              application={app} 
-              delay={index * 0.1} // staggered animation
-            />
-          ))}
-        </div>
+        <JobsList initialApplications={applications} />
       )}
     </div>
   )

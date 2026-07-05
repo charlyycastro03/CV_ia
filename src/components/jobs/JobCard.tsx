@@ -3,8 +3,10 @@
 import { useState } from 'react'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ExternalLink, CheckCircle, ChevronDown, ChevronUp, MapPin, Building, Briefcase } from 'lucide-react'
+import { ExternalLink, CheckCircle, ChevronDown, ChevronUp, MapPin, Building, Briefcase, BookmarkPlus, Loader2 } from 'lucide-react'
 import { SlideIn } from '@/components/animations/SlideIn'
+import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
 
 interface JobCardProps {
   application: any
@@ -13,6 +15,8 @@ interface JobCardProps {
 
 export function JobCard({ application, delay = 0 }: JobCardProps) {
   const [expanded, setExpanded] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const router = useRouter()
   
   const job = application.jobs
   const matchDetails = application.match_details || { pros: [], cons: [], summary: '' }
@@ -24,6 +28,21 @@ export function JobCard({ application, delay = 0 }: JobCardProps) {
   if (score >= 90) scoreColor = 'text-green-500'
   else if (score >= 70) scoreColor = 'text-yellow-500'
   else if (score >= 50) scoreColor = 'text-orange-500'
+
+  const handleSave = async () => {
+    setSaving(true)
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('applications')
+      .update({ status: 'ready_to_apply' })
+      .eq('id', application.id)
+    
+    if (!error) {
+      router.refresh()
+    } else {
+      setSaving(false)
+    }
+  }
 
   return (
     <SlideIn delay={delay}>
@@ -94,11 +113,19 @@ export function JobCard({ application, delay = 0 }: JobCardProps) {
               <><ChevronDown className="w-4 h-4 mr-2" /> Ver Análisis de IA</>
             )}
           </Button>
-          <a href={job.url} target="_blank" rel="noopener noreferrer">
-            <Button variant={isAutoApplied ? "outline" : "default"}>
-              Ver Oferta Original <ExternalLink className="w-4 h-4 ml-2" />
-            </Button>
-          </a>
+          <div className="flex gap-2">
+            {!isAutoApplied && application.status === 'pending_review' && (
+              <Button variant="outline" onClick={handleSave} disabled={saving}>
+                {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <BookmarkPlus className="w-4 h-4 mr-2" />}
+                Guardar
+              </Button>
+            )}
+            <a href={job.url} target="_blank" rel="noopener noreferrer">
+              <Button variant={isAutoApplied ? "outline" : "default"}>
+                Ver Oferta Original <ExternalLink className="w-4 h-4 ml-2" />
+              </Button>
+            </a>
+          </div>
         </CardFooter>
       </Card>
     </SlideIn>
