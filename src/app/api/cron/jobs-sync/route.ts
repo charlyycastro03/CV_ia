@@ -72,8 +72,8 @@ export async function GET(req: NextRequest) {
     // Daily limit config
     const DAILY_LIMIT = 10;
 
-    const MAX_PROFILES_PER_RUN = 5;
-    const MAX_EVALUATIONS_PER_RUN = 30;
+    const MAX_PROFILES_PER_RUN = 2;
+    const MAX_EVALUATIONS_PER_RUN = 3;
 
     // 2. Fetch all users with CV data, order by least recently matched
     const { data: profiles, error: profileErr } = await supabase
@@ -190,9 +190,8 @@ export async function GET(req: NextRequest) {
           notes: `Evaluated job ${job.title} for user ${profile.user_id}. Score: ${match.score}`
         })
 
-        // Routing Rule: >= 90 AND source is known to have auto-apply capacity (Greenhouse, Lever) -> Track A
-        // Else -> Track B (pending_review)
-        let isAutoEligible = match.score >= 90 && (job.source === 'greenhouse' || job.source === 'lever')
+        // Routing Rule: >= 80 -> Treat as auto-eligible for everyone
+        let isAutoEligible = match.score >= 80
         
         let status = isAutoEligible ? 'applied_automatically' : 'pending_review'
         let applicationMethod = isAutoEligible ? 'auto' : 'assisted'
@@ -232,7 +231,11 @@ export async function GET(req: NextRequest) {
           status: status,
           application_method: applicationMethod,
           match_score: match.score,
-          match_details: match,
+          match_details: {
+            ...match,
+            tailored_cv: tailoredCv,
+            cover_letter: coverLetter
+          },
           applied_at: new Date().toISOString()
         }).select('id').maybeSingle()
 
