@@ -134,34 +134,27 @@ export async function GET(req: NextRequest) {
         }
 
         // Ensure job exists in our jobs table
-        const { data: existingJob, error: jobErr } = await supabase
+        const { data: upsertedJob, error: upsertErr } = await supabase
           .from('jobs')
+          .upsert(
+            {
+              title: job.title,
+              company_name: job.company_name,
+              location: job.location,
+              description: job.description,
+              external_id: job.external_id,
+              url: job.url,
+              source: job.source
+            },
+            { onConflict: 'source,external_id', ignoreDuplicates: false }
+          )
           .select('id')
-          .eq('external_id', job.external_id)
-          .eq('source', job.source)
-          .maybeSingle()
+          .single()
 
-        if (jobErr) debugErrors.push('Error checking existing job: ' + jobErr.message)
-
-        let dbJobId
-        if (!existingJob) {
-          const { data: insertedJob, error: insertJobErr } = await supabase.from('jobs').insert({
-            title: job.title,
-            company_name: job.company_name,
-            location: job.location,
-            description: job.description,
-            external_id: job.external_id,
-            url: job.url,
-            source: job.source
-          }).select('id').maybeSingle()
-          
-          if (insertJobErr) {
-            debugErrors.push('Error inserting job (RLS?): ' + insertJobErr.message)
-            console.error('Error inserting job:', insertJobErr.message)
-          }
-          if (insertedJob) dbJobId = insertedJob.id
-        } else {
-          dbJobId = existingJob.id
+        let dbJobId = upsertedJob?.id
+        if (upsertErr) {
+          debugErrors.push(`Error upserting job ${job.source}:${job.external_id}: ` + upsertErr.message)
+          console.error('Error upserting job:', upsertErr.message)
         }
 
         if (!dbJobId) {
