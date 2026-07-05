@@ -9,7 +9,7 @@ export async function fetchAdzunaJobs(query: string, country = "us") {
     const url = `https://api.adzuna.com/v1/api/jobs/${country}/search/1` +
       `?app_id=${appId}` +
       `&app_key=${appKey}` +
-      `&what=${encodeURIComponent(query)}&results_per_page=50`;
+      `&what=${encodeURIComponent(query)}&results_per_page=50&max_days_old=7`;
     const res = await fetchWithTimeout(url, {}, 8000);
     if (!res.ok) return [];
     const data = await res.json();
