@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ExternalLink, CheckCircle, ChevronDown, ChevronUp, MapPin, Building, Briefcase, BookmarkPlus, Loader2 } from 'lucide-react'
+import { ExternalLink, CheckCircle, ChevronDown, ChevronUp, MapPin, Building, Briefcase, BookmarkPlus, Loader2, AlertCircle, BadgeDollarSign } from 'lucide-react'
 import { SlideIn } from '@/components/animations/SlideIn'
 import { ScoreGauge } from '@/components/ui/score-gauge'
 import { createClient } from '@/lib/supabase/client'
@@ -77,12 +77,28 @@ export function JobCard({ application, delay = 0 }: JobCardProps) {
         </CardHeader>
         
         <CardContent>
-          {isAutoApplied && (
-            <div className="mb-4 inline-flex items-center bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-semibold">
-              <CheckCircle className="w-4 h-4 mr-2" />
-              Alta compatibilidad — lista para aplicar
-            </div>
-          )}
+          <div className="flex flex-wrap gap-2 mb-4">
+            {isAutoApplied && (
+              <div className="inline-flex items-center bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-semibold">
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Alta compatibilidad — lista para aplicar
+              </div>
+            )}
+            
+            {matchDetails.cumple_requisitos_obligatorios && score >= 90 && !isAutoApplied && (
+              <div className="inline-flex items-center bg-signal-high/20 text-signal-high px-3 py-1 rounded-full text-sm font-semibold">
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Alta compatibilidad: Cumples todos los requisitos
+              </div>
+            )}
+
+            {matchDetails.salary_confirmed === false && (
+              <div className="inline-flex items-center bg-muted text-muted-foreground px-3 py-1 rounded-full text-sm font-semibold">
+                <BadgeDollarSign className="w-4 h-4 mr-2" />
+                Salario no especificado
+              </div>
+            )}
+          </div>
           
           <p className="text-sm text-foreground/80 line-clamp-2">
             {matchDetails.summary}
@@ -91,6 +107,17 @@ export function JobCard({ application, delay = 0 }: JobCardProps) {
           {expanded && (
             <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {matchDetails.cumple_requisitos_obligatorios === false && matchDetails.requisitos_no_cumplidos?.length > 0 && (
+                  <div className="col-span-1 md:col-span-2 bg-destructive/10 rounded-lg p-4 border border-destructive/20">
+                    <h4 className="font-semibold text-destructive mb-2 flex items-center">
+                      <AlertCircle className="w-4 h-4 mr-2" /> Requisitos Obligatorios No Cumplidos
+                    </h4>
+                    <ul className="list-disc list-inside text-sm space-y-1 text-destructive/90">
+                      {matchDetails.requisitos_no_cumplidos.map((req: string, i: number) => <li key={i}>{req}</li>)}
+                    </ul>
+                  </div>
+                )}
+                
                 <div className="bg-green-500/10 rounded-lg p-4 border border-green-500/20">
                   <h4 className="font-semibold text-green-700 dark:text-green-400 mb-2">Puntos Fuertes (Pros)</h4>
                   <ul className="list-disc list-inside text-sm space-y-1 text-green-900 dark:text-green-200">
@@ -130,7 +157,7 @@ export function JobCard({ application, delay = 0 }: JobCardProps) {
                 {saving ? (
                   <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generando CV...</>
                 ) : (
-                  <><BookmarkPlus className="w-4 h-4 mr-2" /> Guardar</>
+                  <><BookmarkPlus className="w-4 h-4 mr-2" /> Generar CV para este puesto</>
                 )}
               </Button>
             )}

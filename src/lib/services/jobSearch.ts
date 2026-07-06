@@ -36,25 +36,65 @@ export async function fetchRemoteJobs(limit: number = 20, searchQuery?: string):
   }
 }
 
-// Function to filter jobs based on location (worldwide, latam, user specific)
-export function filterJobsByLocation(jobs: RemotiveJob[], userLocation: string): RemotiveJob[] {
-  // A simple heuristic: if it's worldwide, anywhere, or matches the user's country/region
-  const allowedTerms = ['worldwide', 'anywhere', 'global', 'remote', 'latam', 'latin america']
-  const userLocLower = userLocation.toLowerCase()
+// Function to filter jobs based on target locations for the business
+export function filterJobsByLocation(jobs: RemotiveJob[], _userLocation?: string): RemotiveJob[] {
+  // We ignore userLocation now and target global/LATAM/US/EU/AU/NZ
+  const allowedTerms = [
+    'worldwide', 'anywhere', 'global', 'remote', 
+    'latam', 'latin america',
+    'us', 'usa', 'united states', 'america',
+    'uk', 'united kingdom', 'gb',
+    'ca', 'canada',
+    'au', 'australia',
+    'nz', 'new zealand',
+    'eu', 'europe', 'de', 'fr', 'at', 'pl',
+    'brasil', 'brazil'
+  ]
   
   return jobs.filter(job => {
-    const reqLoc = job.candidate_required_location.toLowerCase()
+    const reqLoc = (job.candidate_required_location || '').toLowerCase()
     
     // Si no hay restricción, pasa
     if (!reqLoc || reqLoc === '') return true
     
-    // Si está en los términos globales, pasa
+    // Si incluye alguno de los términos permitidos globales o regionales
     if (allowedTerms.some(term => reqLoc.includes(term))) return true
     
-    // Si incluye la locación del usuario (ej. 'Mexico', 'Argentina', 'Colombia'), pasa
-    if (userLocLower && reqLoc.includes(userLocLower)) return true
-    
-    // De lo contrario, se filtra (restringido a otra zona, ej. 'USA Only', 'UK Only')
     return false
   })
+}
+
+// Very basic salary parser looking for $100k+ patterns
+export function parseAndValidateSalary(text?: string): { valid: boolean, confirmed: boolean } {
+  if (!text) return { valid: true, confirmed: false } // We don't exclude if there is no data
+  
+  const lowerText = text.toLowerCase()
+  
+  // Look for patterns like $100k, 120,000, 100.000
+  const kPattern = /\$?\s*([0-9]{2,3})\s*k/i
+  const thousandPattern = /\$?\s*([0-9]{2,3})[,.][0-9]{3}/i
+  
+  let detectedAmount = 0
+  
+  const kMatch = lowerText.match(kPattern)
+  if (kMatch && kMatch[1]) {
+    detectedAmount = parseInt(kMatch[1], 10) * 1000
+  } else {
+    const tMatch = lowerText.match(thousandPattern)
+    if (tMatch && tMatch[1]) {
+      detectedAmount = parseInt(tMatch[1], 10) * 1000
+    }
+  }
+
+  // If a salary was detected, we enforce the 100k limit. 
+  // (We use 90k as a safe lower boundary to not mistakenly exclude close ranges like 95k)
+  if (detectedAmount > 0) {
+    if (detectedAmount < 90000) {
+      return { valid: false, confirmed: true }
+    }
+    return { valid: true, confirmed: true }
+  }
+
+  // If no salary clearly detected, don't exclude
+  return { valid: true, confirmed: false }
 }

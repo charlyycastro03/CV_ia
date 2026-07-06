@@ -1,15 +1,20 @@
 import { fetchWithTimeout } from '../utils/fetchWithTimeout'
 
-export async function fetchAdzunaJobs(query: string, country = "us") {
+export async function fetchAdzunaJobs(query: string, country = "us", salaryMin?: number) {
   const appId = process.env.ADZUNA_APP_ID;
   const appKey = process.env.ADZUNA_APP_KEY;
   if (!appId || !appKey) return []; // Si no hay credenciales, ignorar Adzuna
 
   try {
-    const url = `https://api.adzuna.com/v1/api/jobs/${country}/search/1` +
+    let url = `https://api.adzuna.com/v1/api/jobs/${country}/search/1` +
       `?app_id=${appId}` +
       `&app_key=${appKey}` +
       `&what=${encodeURIComponent(query)}&results_per_page=50&max_days_old=7`;
+    
+    if (salaryMin) {
+      url += `&salary_min=${salaryMin}`;
+    }
+
     const res = await fetchWithTimeout(url, {}, 8000);
     if (!res.ok) return [];
     const data = await res.json();

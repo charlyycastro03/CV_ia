@@ -3,6 +3,8 @@ import { RemotiveJob } from './jobSearch'
 
 export interface MatchResult {
   score: number // 0 to 100
+  cumple_requisitos_obligatorios: boolean
+  requisitos_no_cumplidos: string[]
   pros: string[]
   cons: string[]
   summary: string
@@ -41,6 +43,8 @@ export async function calculateJobMatch(cvData: any, job: RemotiveJob): Promise<
       Debes devolver un JSON válido con la siguiente estructura estricta:
       {
         "score": 85, 
+        "cumple_requisitos_obligatorios": true,
+        "requisitos_no_cumplidos": [],
         "pros": ["Tiene experiencia en React", "Cumple con los años requeridos"],
         "cons": ["No menciona experiencia en AWS"],
         "summary": "El candidato es un excelente fit técnico pero carece de algo de infraestructura."
@@ -48,6 +52,8 @@ export async function calculateJobMatch(cvData: any, job: RemotiveJob): Promise<
 
       REGLAS:
       - "score" debe ser un número entero entre 0 y 100. Sé objetivo.
+      - "cumple_requisitos_obligatorios" debe ser false SI Y SOLO SI el candidato no cumple con los requisitos mínimos duros y explícitos (ej. "Mínimo 5 años de exp", certificaciones necesarias).
+      - "requisitos_no_cumplidos" es un arreglo con detalles de por qué es false. Si es true, debe ir vacío [].
       - "pros" y "cons" deben ser arreglos de strings cortos (máx 3 cada uno).
       - Responde SOLO con el objeto JSON, nada de texto markdown antes ni después.
     `
@@ -78,6 +84,8 @@ export async function calculateJobMatch(cvData: any, job: RemotiveJob): Promise<
     // Fallback genérico en caso de error de IA o parseo
     return {
       score: 0,
+      cumple_requisitos_obligatorios: false,
+      requisitos_no_cumplidos: ["Error en la validación por la IA"],
       pros: [],
       cons: ["Error al evaluar compatibilidad: " + (error instanceof Error ? error.message : "Desconocido")],
       summary: "No se pudo completar el análisis."
