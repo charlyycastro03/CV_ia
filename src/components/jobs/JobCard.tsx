@@ -5,6 +5,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Button } from '@/components/ui/button'
 import { ExternalLink, CheckCircle, ChevronDown, ChevronUp, MapPin, Building, Briefcase, BookmarkPlus, Loader2 } from 'lucide-react'
 import { SlideIn } from '@/components/animations/SlideIn'
+import { ScoreGauge } from '@/components/ui/score-gauge'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
@@ -22,12 +23,11 @@ export function JobCard({ application, delay = 0 }: JobCardProps) {
   const matchDetails = application.match_details || { pros: [], cons: [], summary: '' }
   const isAutoApplied = application.status === 'ready_to_apply'
 
-  // Score color logic
+  // Score style logic for hover
   const score = application.match_score
-  let scoreColor = 'text-red-500'
-  if (score >= 90) scoreColor = 'text-green-500'
-  else if (score >= 70) scoreColor = 'text-yellow-500'
-  else if (score >= 50) scoreColor = 'text-orange-500'
+  let hoverStyle = 'hover:border-signal-low/50 hover:shadow-[0_0_15px_hsl(var(--signal-low)/0.15)] hover:-translate-y-[2px]'
+  if (score >= 80) hoverStyle = 'hover:border-signal-high/50 hover:shadow-[0_0_15px_hsl(var(--signal-high)/0.15)] hover:-translate-y-[2px]'
+  else if (score >= 50) hoverStyle = 'hover:border-signal-mid/50 hover:shadow-[0_0_15px_hsl(var(--signal-mid)/0.15)] hover:-translate-y-[2px]'
 
   const handleSave = async () => {
     setSaving(true)
@@ -59,7 +59,7 @@ export function JobCard({ application, delay = 0 }: JobCardProps) {
 
   return (
     <SlideIn delay={delay}>
-      <Card className={`overflow-hidden transition-all duration-200 border-2 ${isAutoApplied ? 'border-primary/50 bg-primary/5' : 'hover:border-primary/20'}`}>
+      <Card className={`overflow-hidden transition-all duration-200 border-2 ${isAutoApplied ? 'border-primary/50 bg-primary/5' : 'border-border'} ${hoverStyle}`}>
         <CardHeader className="pb-3">
           <div className="flex justify-between items-start">
             <div>
@@ -69,11 +69,9 @@ export function JobCard({ application, delay = 0 }: JobCardProps) {
                 <span className="flex items-center"><MapPin className="w-4 h-4 mr-1"/> {job.location}</span>
               </div>
             </div>
-            <div className="flex flex-col items-end">
-              <div className={`text-3xl font-black ${scoreColor}`}>
-                {score}%
-              </div>
-              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Match Score</span>
+            <div className="flex flex-col items-end justify-center">
+              <ScoreGauge value={score} size={64} delay={delay} />
+              <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-wider mt-1">Match Score</span>
             </div>
           </div>
         </CardHeader>

@@ -55,7 +55,7 @@ export function Header({ user }: HeaderProps) {
 
           {user && (
             <div className="flex items-center space-x-2 ml-2">
-              <span className="text-sm text-muted-foreground hidden md:inline">
+              <span className="text-xs font-mono text-muted-foreground hidden md:inline">
                 {user.email}
               </span>
             </div>

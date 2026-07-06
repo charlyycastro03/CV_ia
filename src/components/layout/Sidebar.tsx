@@ -32,10 +32,10 @@ export function Sidebar({ user }: SidebarProps) {
             <Link
               key={item.name}
               href={item.href}
-              className={`flex items-center space-x-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
+              className={`flex items-center space-x-3 px-3 py-2.5 rounded-r-md text-sm font-medium transition-colors border-l-4 ${
                 isActive 
-                  ? "bg-primary/10 text-primary" 
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  ? "border-primary bg-muted/50 text-foreground" 
+                  : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
               }`}
             >
               <item.icon className="h-5 w-5" />
@@ -46,7 +46,7 @@ export function Sidebar({ user }: SidebarProps) {
       </nav>
 
       <div className="p-4 border-t border-border">
-        <div className="text-sm font-medium truncate mb-2">{user?.email}</div>
+        <div className="text-xs font-mono text-muted-foreground truncate mb-2">{user?.email}</div>
         <form action="/auth/signout" method="post">
           <button type="submit" className="flex items-center space-x-2 text-sm text-muted-foreground hover:text-destructive transition-colors w-full text-left">
             <LogOut className="h-4 w-4" />

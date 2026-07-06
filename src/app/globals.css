@@ -31,29 +31,37 @@
   }
 
   .dark {
-    /* MODO OSCURO - Negro sólido con naranja */
-    --background: 0 0% 0%;
-    --foreground: 0 0% 100%;
-    --card: 0 0% 7%;
-    --card-foreground: 0 0% 100%;
-    --popover: 0 0% 7%;
-    --popover-foreground: 0 0% 100%;
+    /* MODO OSCURO - Near-black frío, estilo data-driven */
+    --background: 220 15% 5%;
+    --foreground: 210 15% 93%;
+    --card: 220 12% 9%;
+    --card-foreground: 210 15% 93%;
+    --popover: 220 12% 9%;
+    --popover-foreground: 210 15% 93%;
     
-    /* NARANJA SÓLIDO */
+    /* NARANJA SÓLIDO (Marca y CTAs) */
     --primary: 25 95% 53%;
     --primary-foreground: 0 0% 100%;
     
-    --secondary: 0 0% 12%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 0 0% 12%;
-    --muted-foreground: 0 0% 70%;
-    --accent: 0 0% 12%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 62% 30%;
+    --secondary: 220 10% 12%;
+    --secondary-foreground: 210 15% 93%;
+    --muted: 220 10% 12%;
+    --muted-foreground: 215 10% 60%;
+    --accent: 220 10% 12%;
+    --accent-foreground: 210 15% 93%;
+    
+    /* Mantenemos destructive pero más cálido/legible sobre fondo oscuro */
+    --destructive: 357 70% 62%;
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 15%;
-    --input: 0 0% 15%;
+    
+    --border: 220 10% 16%;
+    --input: 220 10% 16%;
     --ring: 25 95% 53%;
+    
+    /* Espectro de Señal (Scores y Status) */
+    --signal-low: 252 70% 68%;
+    --signal-mid: 38 85% 58%;
+    --signal-high: 150 65% 50%;
   }
 }
 

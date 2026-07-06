@@ -38,11 +38,12 @@ export function SlideIn({
         y: getInitialY(),
         x: getInitialX()
       }}
-      animate={{ 
+      whileInView={{ 
         opacity: 1, 
         y: 0,
         x: 0
       }}
+      viewport={{ once: true, margin: "-20px" }}
       transition={{ duration, delay, ease: "easeOut" }}
       className={className}
     >

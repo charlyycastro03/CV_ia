@@ -5,6 +5,7 @@ import { Sidebar } from '@/components/layout/Sidebar'
 import { Header } from '@/components/layout/Header'
 import { MobileNav } from '@/components/layout/MobileNav'
 import { PageTransition } from '@/components/animations/PageTransition'
+import { AmbientBackground } from '@/components/layout/AmbientBackground'
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const supabase = createClient()
@@ -15,7 +16,8 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   }
 
   return (
-    <div className="min-h-screen flex bg-background pb-16 md:pb-0">
+    <div className="min-h-screen flex bg-background pb-16 md:pb-0 relative z-0">
+      <AmbientBackground />
       {/* Desktop Sidebar */}
       <Sidebar user={user} />
 

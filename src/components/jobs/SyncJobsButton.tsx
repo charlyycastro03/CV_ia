@@ -35,12 +35,15 @@ export function SyncJobsButton() {
     <Button 
       onClick={handleSync} 
       disabled={loading}
-      className={`min-w-[200px] ${success ? 'bg-green-600 hover:bg-green-700 text-white' : ''}`}
+      className={`min-w-[200px] relative overflow-hidden transition-all active:scale-[0.97] ${success ? 'bg-green-600 hover:bg-green-700 text-white' : ''}`}
     >
+      {loading && (
+        <div className="absolute inset-x-0 h-1 bg-primary blur-[2px] animate-scan z-10" />
+      )}
       {loading ? (
         <>
-          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          Buscando ofertas...
+          <Sparkles className="w-4 h-4 mr-2 animate-pulse" />
+          Escaneando...
         </>
       ) : success ? (
         <>
