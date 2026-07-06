@@ -19,3 +19,10 @@ export const LEVER_BOARDS = [
   'yelp',
   'canva'
 ];
+
+export const ASHBY_BOARDS = [
+  'reddit',
+  'gumroad',
+  'duolingo',
+  'notion'
+];

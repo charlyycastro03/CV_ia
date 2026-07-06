@@ -4,8 +4,16 @@ import { fetchRemoteJobs, filterJobsByLocation, parseAndValidateSalary } from '@
 import { fetchGreenhouseJobs } from '@/lib/sources/greenhouse'
 import { fetchLeverJobs } from '@/lib/sources/lever'
 import { fetchAdzunaJobs } from '@/lib/sources/adzuna'
+import { fetchRemoteOKJobs } from '@/lib/sources/remoteok'
+import { fetchArbeitnowJobs } from '@/lib/sources/arbeitnow'
+import { fetchHimalayasJobs } from '@/lib/sources/himalayas'
+import { fetchJobicyJobs } from '@/lib/sources/jobicy'
+import { fetchUSAJobs } from '@/lib/sources/usajobs'
+import { fetchReedJobs } from '@/lib/sources/reed'
+import { fetchAshbyJobs } from '@/lib/sources/ashby'
+
 import { ADZUNA_TARGET_COUNTRIES } from '@/lib/constants/targetRegions'
-import { GREENHOUSE_BOARDS, LEVER_BOARDS } from '@/lib/constants/targetCompanies'
+import { GREENHOUSE_BOARDS, LEVER_BOARDS, ASHBY_BOARDS } from '@/lib/constants/targetCompanies'
 import { calculateJobMatch, generateTailoredCVAndLetter } from '@/lib/services/jobMatcher'
 import { sendAutoApplication } from '@/lib/services/autoApply'
 
@@ -66,60 +74,76 @@ export async function GET(req: NextRequest) {
       
       const remotivePromise = fetchRemoteJobs(10, userTargetRole)
       
-      const greenhousePromises = GREENHOUSE_BOARDS.map(board => fetchGreenhouseJobs(board))
-      const leverPromises = LEVER_BOARDS.map(board => fetchLeverJobs(board))
+      // ROTATION STRATEGY: Randomly pick subsets to avoid 60s timeout
+      const getSubset = <T>(arr: T[], n: number) => [...arr].sort(() => 0.5 - Math.random()).slice(0, n);
+
+      const selectedGreenhouse = getSubset(GREENHOUSE_BOARDS, 2);
+      const selectedLever = getSubset(LEVER_BOARDS, 1);
+      const selectedAshby = getSubset(ASHBY_BOARDS, 1);
+      const selectedAdzuna = getSubset(ADZUNA_TARGET_COUNTRIES, 1);
       
-      const adzunaPromises = ADZUNA_TARGET_COUNTRIES.map(country => 
+      const greenhousePromises = selectedGreenhouse.map(board => fetchGreenhouseJobs(board))
+      const leverPromises = selectedLever.map(board => fetchLeverJobs(board))
+      const ashbyPromises = selectedAshby.map(board => fetchAshbyJobs(board))
+      
+      const adzunaPromises = selectedAdzuna.map(country => 
         fetchAdzunaJobs(`${userTargetRole} remote`, country.code, country.salaryMin)
       )
+
+      // Randomly pick 2 from Tier 1
+      const tier1Sources = [
+        () => fetchRemoteOKJobs(userTargetRole),
+        () => fetchArbeitnowJobs(),
+        () => fetchHimalayasJobs(),
+        () => fetchJobicyJobs()
+      ];
+      const selectedTier1 = getSubset(tier1Sources, 2).map(fn => fn());
+
+      // Randomly pick 1 from Tier 2
+      const tier2Sources = [
+        () => fetchUSAJobs(userTargetRole),
+        () => fetchReedJobs(userTargetRole)
+      ];
+      const selectedTier2 = getSubset(tier2Sources, 1).map(fn => fn());
 
       const allPromises = [
         remotivePromise,
         ...greenhousePromises,
         ...leverPromises,
-        ...adzunaPromises
+        ...ashbyPromises,
+        ...adzunaPromises,
+        ...selectedTier1,
+        ...selectedTier2
       ]
 
       const results = await Promise.allSettled(allPromises)
       console.timeEnd(`fetchExternalSources-${profile.user_id}`)
 
-      const rawRemotive = results[0].status === 'fulfilled' ? results[0].value : []
-      
-      let rawGreenhouse: any[] = []
-      for (let i = 0; i < greenhousePromises.length; i++) {
-        const res = results[1 + i]
-        if (res.status === 'fulfilled' && res.value) rawGreenhouse.push(...res.value)
+      let allRawJobs: any[] = []
+
+      // Extract results safely
+      for (const res of results) {
+        if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+          allRawJobs.push(...res.value)
+        }
       }
 
-      let rawLever: any[] = []
-      for (let i = 0; i < leverPromises.length; i++) {
-        const res = results[1 + greenhousePromises.length + i]
-        if (res.status === 'fulfilled' && res.value) rawLever.push(...res.value)
-      }
-
-      let rawAdzuna: any[] = []
-      for (let i = 0; i < adzunaPromises.length; i++) {
-        const res = results[1 + greenhousePromises.length + leverPromises.length + i]
-        if (res.status === 'fulfilled' && res.value) rawAdzuna.push(...res.value)
-      }
-
-      const remotiveJobs = rawRemotive.map((j: any) => ({
-        source: 'remotive',
-        external_id: String(j.id),
-        company_name: j.company_name,
-        title: j.title,
-        location: j.candidate_required_location,
-        description: j.description,
-        salary_text: j.salary, // Para parsear luego
-        url: j.url,
-        raw: j
-      }))
-
-      const greenhouseJobs = rawGreenhouse.map((j: any) => ({ ...j, company_name: j.company, url: j.apply_url }))
-      const leverJobs = rawLever.map((j: any) => ({ ...j, company_name: j.company, url: j.apply_url }))
-      const adzunaJobs = rawAdzuna.map((j: any) => ({ ...j, company_name: j.company, url: j.apply_url }))
-
-      const allRawJobs = [...remotiveJobs, ...greenhouseJobs, ...leverJobs, ...adzunaJobs]
+      // Format all extracted jobs
+      allRawJobs = allRawJobs.map((j: any) => {
+        // Remotive doesn't output source internally in our helper, fix it here or in filter
+        const source = j.source || 'remotive'; 
+        return {
+          source,
+          external_id: String(j.external_id || j.id || Math.random().toString(36).substr(2, 9)),
+          company_name: j.company_name || j.company || '',
+          title: j.title || '',
+          location: j.location || j.candidate_required_location || 'Worldwide',
+          description: j.description || '',
+          salary_text: j.salary_text || j.salary || '', 
+          url: j.apply_url || j.url || '',
+          raw: j.raw || j
+        }
+      })
 
       // Filter location for remotive specifically and validate salary for all
       const applicableJobs = allRawJobs.filter((job: any) => {
