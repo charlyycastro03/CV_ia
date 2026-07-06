@@ -29,30 +29,30 @@ export function JobCard({ application, delay = 0 }: JobCardProps) {
   if (score >= 80) hoverStyle = 'hover:border-signal-high/50 hover:shadow-[0_0_15px_hsl(var(--signal-high)/0.15)] hover:-translate-y-[2px]'
   else if (score >= 50) hoverStyle = 'hover:border-signal-mid/50 hover:shadow-[0_0_15px_hsl(var(--signal-mid)/0.15)] hover:-translate-y-[2px]'
 
-  const handleSave = async () => {
+  const handleAction = async () => {
     setSaving(true)
     try {
-      if (!matchDetails.tailored_cv) {
-        // Necesitamos generar el CV antes de guardarlo en Mis Aplicaciones
-        const res = await fetch('/api/cv/generate-tailored', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ applicationId: application.id })
-        })
-        if (!res.ok) throw new Error('Failed to generate CV')
-      } else {
-        // Si ya tiene CV, solo actualizamos el estado
+      if (application.status === 'pending_review') {
+        // Solo guardamos en Mis Aplicaciones sin generar CV aún
         const supabase = createClient()
         const { error } = await supabase
           .from('applications')
           .update({ status: 'ready_to_apply' })
           .eq('id', application.id)
         if (error) throw error
+      } else if (application.status === 'ready_to_apply' && !matchDetails.tailored_cv) {
+        // Generar CV porque ya está guardado
+        const res = await fetch('/api/cv/generate-tailored', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ applicationId: application.id })
+        })
+        if (!res.ok) throw new Error('Failed to generate CV')
       }
       router.refresh()
     } catch (e) {
       console.error(e)
-      alert("Hubo un error al guardar y generar tu CV. Intenta de nuevo.")
+      alert("Hubo un error al procesar tu solicitud. Intenta de nuevo.")
       setSaving(false)
     }
   }
@@ -152,8 +152,17 @@ export function JobCard({ application, delay = 0 }: JobCardProps) {
             )}
           </Button>
           <div className="flex gap-2">
-            {!isAutoApplied && application.status === 'pending_review' && (
-              <Button variant="outline" onClick={handleSave} disabled={saving}>
+            {application.status === 'pending_review' && (
+              <Button variant="outline" onClick={handleAction} disabled={saving}>
+                {saving ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Guardando...</>
+                ) : (
+                  <><BookmarkPlus className="w-4 h-4 mr-2" /> Guardar</>
+                )}
+              </Button>
+            )}
+            {application.status === 'ready_to_apply' && !matchDetails.tailored_cv && (
+              <Button variant="default" onClick={handleAction} disabled={saving}>
                 {saving ? (
                   <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generando CV...</>
                 ) : (
