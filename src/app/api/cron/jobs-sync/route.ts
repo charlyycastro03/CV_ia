@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { fetchRemoteJobs, filterJobsByLocation, parseAndValidateSalary } from '@/lib/services/jobSearch'
+import { fetchRemoteJobs, filterJobsByLocation } from '@/lib/services/jobSearch'
 import { fetchGreenhouseJobs } from '@/lib/sources/greenhouse'
 import { fetchLeverJobs } from '@/lib/sources/lever'
 import { fetchAdzunaJobs } from '@/lib/sources/adzuna'
@@ -8,41 +8,43 @@ import { fetchRemoteOKJobs } from '@/lib/sources/remoteok'
 import { fetchArbeitnowJobs } from '@/lib/sources/arbeitnow'
 import { fetchHimalayasJobs } from '@/lib/sources/himalayas'
 import { fetchJobicyJobs } from '@/lib/sources/jobicy'
-import { fetchUSAJobs } from '@/lib/sources/usajobs'
-import { fetchReedJobs } from '@/lib/sources/reed'
-import { fetchAshbyJobs } from '@/lib/sources/ashby'
 
 import { ADZUNA_TARGET_COUNTRIES } from '@/lib/constants/targetRegions'
-import { GREENHOUSE_BOARDS, LEVER_BOARDS, ASHBY_BOARDS } from '@/lib/constants/targetCompanies'
+import { GREENHOUSE_BOARDS, LEVER_BOARDS } from '@/lib/constants/targetCompanies'
 import { calculateJobMatch } from '@/lib/services/jobMatcher'
 
-// Using service role client to bypass RLS for background jobs
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-if (!supabaseServiceKey) {
-  console.error('CRITICAL: SUPABASE_SERVICE_ROLE_KEY is missing in env vars. RLS will block inserts.')
-}
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
-
-export const maxDuration = 60; // Max execution time for the cron job (in seconds)
+export const maxDuration = 60;
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
-  // Simple auth for cron (in production, use VERCEL_CRON_SECRET)
+  // Auth check for cron
   const authHeader = req.headers.get('authorization')
   if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // CRITICAL: Create supabase client INSIDE the request handler
+  // to ensure env vars are fully loaded (not at module init time)
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+  if (!supabaseServiceKey) {
+    console.error('CRITICAL: SUPABASE_SERVICE_ROLE_KEY missing — inserts will fail RLS')
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey)
+
   try {
     let totalEvaluated = 0
+    let totalSaved = 0
     let debugErrors: string[] = []
 
-    const MAX_PROFILES_PER_RUN = 2; // Procesamos más perfiles ahora que es rápido
-    const MAX_EVALUATIONS_PER_RUN = 10;
+    // Higher limits now that we removed the slow generateCV step
+    const MAX_PROFILES_PER_RUN = 2;
+    const MAX_EVALUATIONS_PER_RUN = 15;
 
-    // 1. Fetch all users with CV data, order by least recently matched
+    // 1. Fetch profiles with CV data
     const { data: profiles, error: profileErr } = await supabase
       .from('profiles')
       .select('user_id, cv_data, last_matched_at')
@@ -61,117 +63,79 @@ export async function GET(req: NextRequest) {
     let profilesProcessed: string[] = []
 
     for (const profile of profiles) {
-      if (totalEvaluated >= MAX_EVALUATIONS_PER_RUN) {
-         debugErrors.push(`Reached global limit of ${MAX_EVALUATIONS_PER_RUN} evaluations this run. Stopping early.`)
-         break;
-      }
-      
-      const userLocation = profile.cv_data.location || 'worldwide'
-      const userTargetRole = profile.cv_data.target_role || profile.cv_data.title || profile.cv_data.basics?.label || 'software engineer'
-      
-      // 2. Fetch specific jobs for this user
-      console.time(`fetchExternalSources-${profile.user_id}`)
-      
-      const remotivePromise = fetchRemoteJobs(10, userTargetRole)
-      
-      // ROTATION STRATEGY: Randomly pick subsets to avoid 60s timeout
+      if (totalEvaluated >= MAX_EVALUATIONS_PER_RUN) break;
+
+      const userLocation = profile.cv_data?.location || 'worldwide'
+      const userTargetRole = profile.cv_data?.target_role
+        || profile.cv_data?.title
+        || profile.cv_data?.basics?.label
+        || 'software developer'
+
+      debugErrors.push(`Processing profile ${profile.user_id}, role: ${userTargetRole}`)
+
+      // 2. Fetch jobs — use a FAST subset to avoid 60s timeout
       const getSubset = <T>(arr: T[], n: number) => [...arr].sort(() => 0.5 - Math.random()).slice(0, n);
 
-      const selectedGreenhouse = getSubset(GREENHOUSE_BOARDS, 2);
-      const selectedLever = getSubset(LEVER_BOARDS, 1);
-      const selectedAshby = getSubset(ASHBY_BOARDS, 1);
-      const selectedAdzuna = getSubset(ADZUNA_TARGET_COUNTRIES, 1);
-      
-      const greenhousePromises = selectedGreenhouse.map(board => fetchGreenhouseJobs(board))
-      const leverPromises = selectedLever.map(board => fetchLeverJobs(board))
-      const ashbyPromises = selectedAshby.map(board => fetchAshbyJobs(board))
-      
-      const adzunaPromises = selectedAdzuna.map(country => 
-        fetchAdzunaJobs(`${userTargetRole} remote`, country.code, country.salaryMin)
-      )
-
-      // Randomly pick 2 from Tier 1
-      const tier1Sources = [
-        () => fetchRemoteOKJobs(userTargetRole),
-        () => fetchArbeitnowJobs(),
-        () => fetchHimalayasJobs(),
-        () => fetchJobicyJobs()
-      ];
-      const selectedTier1 = getSubset(tier1Sources, 2).map(fn => fn());
-
-      // Randomly pick 1 from Tier 2
-      const tier2Sources = [
-        () => fetchUSAJobs(userTargetRole),
-        () => fetchReedJobs(userTargetRole)
-      ];
-      const selectedTier2 = getSubset(tier2Sources, 1).map(fn => fn());
-
       const allPromises = [
-        remotivePromise,
-        ...greenhousePromises,
-        ...leverPromises,
-        ...ashbyPromises,
-        ...adzunaPromises,
-        ...selectedTier1,
-        ...selectedTier2
+        fetchRemoteJobs(15, userTargetRole),          // Remotive
+        fetchArbeitnowJobs(),                          // Arbeitnow — fast, no auth
+        fetchHimalayasJobs(),                          // Himalayas — fast, no auth
+        fetchJobicyJobs(),                             // Jobicy — fast, no auth
+        fetchRemoteOKJobs(userTargetRole),             // RemoteOK — fast, no auth
+        ...getSubset(GREENHOUSE_BOARDS, 2).map(b => fetchGreenhouseJobs(b)),  // 2 Greenhouse boards
+        ...getSubset(LEVER_BOARDS, 1).map(b => fetchLeverJobs(b)),            // 1 Lever board
+        ...getSubset(ADZUNA_TARGET_COUNTRIES, 1).map(c =>
+          fetchAdzunaJobs(`${userTargetRole} remote`, c.code, c.salaryMin)
+        ),
       ]
 
       const results = await Promise.allSettled(allPromises)
-      console.timeEnd(`fetchExternalSources-${profile.user_id}`)
 
       let allRawJobs: any[] = []
-
-      // Extract results safely
       for (const res of results) {
         if (res.status === 'fulfilled' && Array.isArray(res.value)) {
           allRawJobs.push(...res.value)
+        } else if (res.status === 'rejected') {
+          debugErrors.push('Source failed: ' + String(res.reason).substring(0, 100))
         }
       }
 
-      // Format all extracted jobs
-      allRawJobs = allRawJobs.map((j: any) => {
-        // Remotive doesn't output source internally in our helper, fix it here or in filter
-        const source = j.source || 'remotive'; 
-        return {
-          source,
-          external_id: String(j.external_id || j.id || Math.random().toString(36).substr(2, 9)),
-          company_name: j.company_name || j.company || '',
-          title: j.title || '',
-          location: j.location || j.candidate_required_location || 'Worldwide',
-          description: j.description || '',
-          salary_text: j.salary_text || j.salary || '', 
-          url: j.apply_url || j.url || '',
-          raw: j.raw || j
-        }
-      })
+      debugErrors.push(`Total raw jobs fetched: ${allRawJobs.length}`)
 
-      // Filter location for remotive specifically and validate salary for all
-      const applicableJobs = allRawJobs.filter((job: any) => {
+      // 3. Normalize
+      const normalizedJobs = allRawJobs.map((j: any) => ({
+        source: j.source || 'remotive',
+        external_id: String(j.external_id || j.id || Math.random().toString(36).substr(2, 9)),
+        company_name: j.company_name || j.company || '',
+        title: j.title || '',
+        location: j.location || j.candidate_required_location || 'Worldwide',
+        description: j.description || '',
+        salary_text: j.salary_text || j.salary || '',
+        url: j.apply_url || j.url || '',
+        raw: j.raw || j
+      }))
+
+      // 4. Filter — ONLY location filter for Remotive, NO salary filter (too aggressive)
+      const applicableJobs = normalizedJobs.filter((job: any) => {
         if (job.source === 'remotive') {
-          if (filterJobsByLocation([job.raw], userLocation).length === 0) return false;
+          return filterJobsByLocation([job.raw], userLocation).length > 0
         }
-        
-        const salaryText = job.salary_text || job.description; // Fallback to description text for parsing
-        const salaryCheck = parseAndValidateSalary(salaryText);
-        
-        if (!salaryCheck.valid) return false; // Rejected due to low salary explicitly found
-        
-        job.salary_confirmed = salaryCheck.confirmed;
-        return true;
+        return true // All other sources: don't filter by salary/location
       })
-      
+
+      debugErrors.push(`Jobs after filter: ${applicableJobs.length}`)
+
       if (applicableJobs.length === 0) {
-         debugErrors.push(`No applicable jobs for location: ${userLocation} and role: ${userTargetRole}`)
-         continue;
+        debugErrors.push(`No applicable jobs for ${userTargetRole}`)
+        profilesProcessed.push(profile.user_id)
+        continue;
       }
 
+      // 5. Process jobs — upsert to jobs table, then evaluate match
       for (const job of applicableJobs) {
-        if (totalEvaluated >= MAX_EVALUATIONS_PER_RUN) {
-           debugErrors.push(`Reached global limit of ${MAX_EVALUATIONS_PER_RUN} evaluations this run inside loop.`)
-           break;
-        }
+        if (totalEvaluated >= MAX_EVALUATIONS_PER_RUN) break;
 
-        // Ensure job exists in our jobs table
+        // Upsert job to DB
         const { data: upsertedJob, error: upsertErr } = await supabase
           .from('jobs')
           .upsert(
@@ -179,7 +143,7 @@ export async function GET(req: NextRequest) {
               title: job.title,
               company_name: job.company_name,
               location: job.location,
-              description: job.description,
+              description: (job.description || '').substring(0, 5000), // Limit description size
               external_id: job.external_id,
               url: job.url,
               source: job.source
@@ -189,107 +153,78 @@ export async function GET(req: NextRequest) {
           .select('id')
           .single()
 
-        let dbJobId = upsertedJob?.id
         if (upsertErr) {
-          debugErrors.push(`Error upserting job ${job.source}:${job.external_id}: ` + upsertErr.message)
-          console.error('Error upserting job:', upsertErr.message)
-        }
-
-        if (!dbJobId) {
-          debugErrors.push('Skipping job evaluation because dbJobId could not be obtained')
-          console.error('Skipping job evaluation because dbJobId could not be obtained (RLS issue?)')
+          debugErrors.push(`Upsert error [${job.source}:${job.external_id}]: ${upsertErr.message} (code: ${upsertErr.code})`)
           continue
         }
 
-        // Check if application/evaluation already exists
-        const { data: existingApp, error: appErr } = await supabase
+        const dbJobId = upsertedJob?.id
+        if (!dbJobId) {
+          debugErrors.push(`No dbJobId for [${job.source}:${job.external_id}] — RLS?`)
+          continue
+        }
+
+        // Check if already evaluated
+        const { data: existingApp } = await supabase
           .from('applications')
           .select('id')
           .eq('user_id', profile.user_id)
           .eq('job_id', dbJobId)
           .maybeSingle()
 
-        if (appErr) debugErrors.push('Error checking existing app: ' + appErr.message)
+        if (existingApp) continue;
 
-        if (existingApp) {
-          continue; // Already processed this job for this user
+        // Evaluate match with AI
+        totalEvaluated++
+        const match = await calculateJobMatch(profile.cv_data, job as any)
+        if (!match) {
+          debugErrors.push(`calculateJobMatch returned null for ${job.title}`)
+          continue;
         }
 
-        totalEvaluated++
-        console.time(`calculateJobMatch-${profile.user_id}-${job.title.substring(0,10)}`)
-        const match = await calculateJobMatch(profile.cv_data, job)
-        console.timeEnd(`calculateJobMatch-${profile.user_id}-${job.title.substring(0,10)}`)
-        
-        if (!match) continue;
-
-        await supabase.from('application_logs').insert({
-          application_id: null,
-          status: 'evaluated',
-          notes: `Evaluated job ${job.title} for user ${profile.user_id}. Score: ${match.score}`
-        })
-
-        const status = 'pending_review'
-        const applicationMethod = 'assisted'
-
-        const { data: appData, error: insertAppErr } = await supabase.from('applications').insert({
-          user_id: profile.user_id,
-          job_id: dbJobId,
-          status: status,
-          application_method: applicationMethod,
-          match_score: match.score,
-          match_details: {
-            ...match,
-            salary_confirmed: job.salary_confirmed,
-          },
-          applied_at: new Date().toISOString()
-        }).select('id').maybeSingle()
+        // Insert application
+        const { data: appData, error: insertAppErr } = await supabase
+          .from('applications')
+          .insert({
+            user_id: profile.user_id,
+            job_id: dbJobId,
+            status: 'pending_review',
+            application_method: 'assisted',
+            match_score: match.score,
+            match_details: { ...match, salary_confirmed: !!job.salary_text },
+            applied_at: new Date().toISOString()
+          })
+          .select('id')
+          .maybeSingle()
 
         if (insertAppErr) {
-          debugErrors.push('Error inserting application (RLS?): ' + insertAppErr.message)
-          console.error('Error inserting application:', insertAppErr.message)
+          debugErrors.push(`Insert app error: ${insertAppErr.message} (code: ${insertAppErr.code})`)
         } else if (appData) {
-          // Log insertion
-          await supabase.from('application_logs').insert({
-            application_id: appData.id,
-            status: status,
-            notes: `Application routed to ${applicationMethod} con status ${status}.`
-          })
-
-          // Add extra log if high compatibility
-          if (match.score >= 80 && match.cumple_requisitos_obligatorios) {
-            await supabase.from('application_logs').insert({
-              application_id: appData.id,
-              status: 'pending_review',
-              notes: 'Alta compatibilidad detectada — pendiente de acción del usuario.'
-            })
-          }
+          totalSaved++
         }
-      } // end job loop
-      
-      profilesProcessed.push(profile.user_id)
-    } // end profile loop
+      }
 
-    // 3. Update last_matched_at for processed profiles
+      profilesProcessed.push(profile.user_id)
+    }
+
+    // Update last_matched_at
     if (profilesProcessed.length > 0) {
-      const { error: updateErr } = await supabase
+      await supabase
         .from('profiles')
         .update({ last_matched_at: new Date().toISOString() })
         .in('user_id', profilesProcessed)
-        
-      if (updateErr) {
-        debugErrors.push('Error updating last_matched_at: ' + updateErr.message)
-      }
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
-      totalEvaluated, 
+      totalEvaluated,
+      totalSaved,
       profilesProcessed: profilesProcessed.length,
-      errors: debugErrors 
+      errors: debugErrors
     })
 
   } catch (error: any) {
     console.error('Cron Error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: error.message, stack: error.stack }, { status: 500 })
   }
 }
