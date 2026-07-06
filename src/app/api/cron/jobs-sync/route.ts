@@ -22,49 +22,6 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    console.time('fetchExternalSources')
-    // 1. Fetch from all sources in parallel
-    const [
-      remotiveRes,
-      greenhouseDiscordRes,
-      greenhouseTwitchRes,
-      leverRes,
-      adzunaRes
-    ] = await Promise.allSettled([
-      fetchRemoteJobs(10),
-      fetchGreenhouseJobs('discord'),
-      fetchGreenhouseJobs('twitch'),
-      fetchLeverJobs('lever'),
-      fetchAdzunaJobs('software engineer', 'us')
-    ])
-    console.timeEnd('fetchExternalSources')
-
-    // Extraemos resultados, manejando posibles rechazos
-    const rawRemotive = remotiveRes.status === 'fulfilled' ? remotiveRes.value : []
-    const rawGreenhouse = greenhouseDiscordRes.status === 'fulfilled' ? greenhouseDiscordRes.value : []
-    const rawGreenhouse2 = greenhouseTwitchRes.status === 'fulfilled' ? greenhouseTwitchRes.value : []
-    const rawLever = leverRes.status === 'fulfilled' ? leverRes.value : []
-    const rawAdzuna = adzunaRes.status === 'fulfilled' ? adzunaRes.value : []
-
-    // Map remotive to standard internal format
-    const remotiveJobs = rawRemotive.map((j: any) => ({
-      source: 'remotive',
-      external_id: String(j.id),
-      company_name: j.company_name,
-      title: j.title,
-      location: j.candidate_required_location,
-      description: j.description,
-      url: j.url,
-      raw: j
-    }))
-
-    const greenhouseJobs = rawGreenhouse.map((j: any) => ({ ...j, company_name: j.company, url: j.apply_url }))
-    const greenhouseJobs2 = rawGreenhouse2.map((j: any) => ({ ...j, company_name: j.company, url: j.apply_url }))
-    const leverJobs = rawLever.map((j: any) => ({ ...j, company_name: j.company, url: j.apply_url }))
-    const adzunaJobs = rawAdzuna.map((j: any) => ({ ...j, company_name: j.company, url: j.apply_url }))
-
-    const allRawJobs = [...remotiveJobs, ...greenhouseJobs, ...greenhouseJobs2, ...leverJobs, ...adzunaJobs]
-    
     let newAutoApplications = 0
     let totalEvaluated = 0
     let debugErrors: string[] = []
@@ -75,7 +32,7 @@ export async function GET(req: NextRequest) {
     const MAX_PROFILES_PER_RUN = 2;
     const MAX_EVALUATIONS_PER_RUN = 3;
 
-    // 2. Fetch all users with CV data, order by least recently matched
+    // 1. Fetch all users with CV data, order by least recently matched
     const { data: profiles, error: profileErr } = await supabase
       .from('profiles')
       .select('user_id, cv_data, last_matched_at')
@@ -100,7 +57,49 @@ export async function GET(req: NextRequest) {
       }
       
       const userLocation = profile.cv_data.location || 'worldwide'
+      const userTargetRole = profile.cv_data.target_role || profile.cv_data.title || profile.cv_data.basics?.label || 'software engineer'
       
+      // 2. Fetch specific jobs for this user
+      console.time(`fetchExternalSources-${profile.user_id}`)
+      const [
+        remotiveRes,
+        greenhouseDiscordRes,
+        greenhouseTwitchRes,
+        leverRes,
+        adzunaRes
+      ] = await Promise.allSettled([
+        fetchRemoteJobs(10, userTargetRole), // Remotive es 100% remoto, usaremos el rol del usuario
+        fetchGreenhouseJobs('discord'),
+        fetchGreenhouseJobs('twitch'),
+        fetchLeverJobs('lever'),
+        fetchAdzunaJobs(`${userTargetRole} remote`, 'us') // Agregamos 'remote' para forzar empleos remotos en Adzuna
+      ])
+      console.timeEnd(`fetchExternalSources-${profile.user_id}`)
+
+      const rawRemotive = remotiveRes.status === 'fulfilled' ? remotiveRes.value : []
+      const rawGreenhouse = greenhouseDiscordRes.status === 'fulfilled' ? greenhouseDiscordRes.value : []
+      const rawGreenhouse2 = greenhouseTwitchRes.status === 'fulfilled' ? greenhouseTwitchRes.value : []
+      const rawLever = leverRes.status === 'fulfilled' ? leverRes.value : []
+      const rawAdzuna = adzunaRes.status === 'fulfilled' ? adzunaRes.value : []
+
+      const remotiveJobs = rawRemotive.map((j: any) => ({
+        source: 'remotive',
+        external_id: String(j.id),
+        company_name: j.company_name,
+        title: j.title,
+        location: j.candidate_required_location,
+        description: j.description,
+        url: j.url,
+        raw: j
+      }))
+
+      const greenhouseJobs = rawGreenhouse.map((j: any) => ({ ...j, company_name: j.company, url: j.apply_url }))
+      const greenhouseJobs2 = rawGreenhouse2.map((j: any) => ({ ...j, company_name: j.company, url: j.apply_url }))
+      const leverJobs = rawLever.map((j: any) => ({ ...j, company_name: j.company, url: j.apply_url }))
+      const adzunaJobs = rawAdzuna.map((j: any) => ({ ...j, company_name: j.company, url: j.apply_url }))
+
+      const allRawJobs = [...remotiveJobs, ...greenhouseJobs, ...greenhouseJobs2, ...leverJobs, ...adzunaJobs]
+
       // Filter location for remotive specifically, others are already globally queried or US specific
       const applicableJobs = allRawJobs.filter((job: any) => {
         if (job.source === 'remotive') {
@@ -110,7 +109,7 @@ export async function GET(req: NextRequest) {
       })
       
       if (applicableJobs.length === 0) {
-         debugErrors.push(`No applicable jobs for location: ${userLocation}`)
+         debugErrors.push(`No applicable jobs for location: ${userLocation} and role: ${userTargetRole}`)
          continue;
       }
 

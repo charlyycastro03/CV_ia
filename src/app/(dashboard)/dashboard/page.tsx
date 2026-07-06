@@ -82,46 +82,52 @@ export default function DashboardPage() {
 
         {/* Tarjetas de Estadísticas */}
         <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">CV Cargado</CardTitle>
-              <FileText className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {stats.cvUploaded ? 'Activo' : 'Pendiente'}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {stats.cvUploaded ? 'Tu CV está listo para usar' : 'Sube tu CV para comenzar'}
-              </p>
-            </CardContent>
-          </Card>
+          <Link href="/cv-upload" className="block transition-transform hover:scale-[1.02]">
+            <Card className="h-full hover:border-primary/50 transition-colors cursor-pointer">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">CV Cargado</CardTitle>
+                <FileText className="h-4 w-4 text-primary" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {stats.cvUploaded ? 'Activo' : 'Pendiente'}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {stats.cvUploaded ? 'Tu CV está listo para usar' : 'Sube tu CV para comenzar'}
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Aplicaciones</CardTitle>
-              <Briefcase className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.applications}</div>
-              <p className="text-xs text-muted-foreground">
-                Empleos listos o enviados
-              </p>
-            </CardContent>
-          </Card>
+          <Link href="/applications" className="block transition-transform hover:scale-[1.02]">
+            <Card className="h-full hover:border-primary/50 transition-colors cursor-pointer">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Aplicaciones</CardTitle>
+                <Briefcase className="h-4 w-4 text-primary" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.applications}</div>
+                <p className="text-xs text-muted-foreground">
+                  Empleos listos o enviados
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Evaluados por IA</CardTitle>
-              <TrendingUp className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.evaluated}</div>
-              <p className="text-xs text-muted-foreground">
-                Empleos rastreados y calificados
-              </p>
-            </CardContent>
-          </Card>
+          <Link href="/jobs" className="block transition-transform hover:scale-[1.02]">
+            <Card className="h-full hover:border-primary/50 transition-colors cursor-pointer">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Evaluados por IA</CardTitle>
+                <TrendingUp className="h-4 w-4 text-primary" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.evaluated}</div>
+                <p className="text-xs text-muted-foreground">
+                  Empleos rastreados y calificados
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
 
         {/* Marcapasos (Progress Tracker) */}

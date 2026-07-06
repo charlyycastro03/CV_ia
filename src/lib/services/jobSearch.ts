@@ -14,10 +14,15 @@ export interface RemotiveJob {
   description: string
 }
 
-export async function fetchRemoteJobs(limit: number = 20): Promise<RemotiveJob[]> {
+export async function fetchRemoteJobs(limit: number = 20, searchQuery?: string): Promise<RemotiveJob[]> {
   try {
-    // We fetch jobs from software dev category to keep it relevant
-    const response = await fetchWithTimeout('https://remotive.com/api/remote-jobs?category=software-dev&limit=' + limit, {}, 8000)
+    let url = 'https://remotive.com/api/remote-jobs?limit=' + limit
+    if (searchQuery) {
+      url += '&search=' + encodeURIComponent(searchQuery)
+    } else {
+      url += '&category=software-dev'
+    }
+    const response = await fetchWithTimeout(url, {}, 8000)
     
     if (!response.ok) {
       throw new Error(`Remotive API error: ${response.statusText}`)
