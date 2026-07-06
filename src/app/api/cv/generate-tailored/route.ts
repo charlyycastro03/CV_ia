@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Generate Tailored CV via Gemini using jobMatcher service
-    const tailoredData = await generateTailoredCVAndLetter(profile.resume_data, application.jobs)
+    const tailoredData = await generateTailoredCVAndLetter(profile.cv_data, application.jobs)
 
     if (!tailoredData || !tailoredData.cv_adaptado) {
       return NextResponse.json({ error: 'Failed to generate tailored CV' }, { status: 500 })

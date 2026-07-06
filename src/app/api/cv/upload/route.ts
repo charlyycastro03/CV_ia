@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
       Estructura requerida:
       {
         "name": "Nombre completo",
+        "target_role": "El rol principal que la persona busca (ej. Frontend Developer, Data Scientist). Infiérelo de la experiencia y título.",
         "email": "Correo electrónico",
         "phone": "Número de teléfono",
         "location": "Ciudad, País",

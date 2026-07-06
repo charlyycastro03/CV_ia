@@ -22,6 +22,11 @@ export default async function JobsPage() {
     .eq('user_id', user.id)
     .eq('status', 'pending_review')
     .order('match_score', { ascending: false })
+    .limit(50)
+
+  if (error) {
+    console.error('Jobs query error:', error)
+  }
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-8">
@@ -29,7 +34,7 @@ export default async function JobsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Empleos Recomendados</h1>
           <p className="text-muted-foreground mt-2">
-            Ofertas filtradas y evaluadas automáticamente por nuestra IA contra tu currículum.
+            {applications?.length || 0} ofertas filtradas y evaluadas automáticamente por nuestra IA contra tu currículum.
           </p>
         </div>
         
