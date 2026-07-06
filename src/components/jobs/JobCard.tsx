@@ -31,15 +31,28 @@ export function JobCard({ application, delay = 0 }: JobCardProps) {
 
   const handleSave = async () => {
     setSaving(true)
-    const supabase = createClient()
-    const { error } = await supabase
-      .from('applications')
-      .update({ status: 'ready_to_apply' })
-      .eq('id', application.id)
-    
-    if (!error) {
+    try {
+      if (!matchDetails.tailored_cv) {
+        // Necesitamos generar el CV antes de guardarlo en Mis Aplicaciones
+        const res = await fetch('/api/cv/generate-tailored', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ applicationId: application.id })
+        })
+        if (!res.ok) throw new Error('Failed to generate CV')
+      } else {
+        // Si ya tiene CV, solo actualizamos el estado
+        const supabase = createClient()
+        const { error } = await supabase
+          .from('applications')
+          .update({ status: 'ready_to_apply' })
+          .eq('id', application.id)
+        if (error) throw error
+      }
       router.refresh()
-    } else {
+    } catch (e) {
+      console.error(e)
+      alert("Hubo un error al guardar y generar tu CV. Intenta de nuevo.")
       setSaving(false)
     }
   }
@@ -116,8 +129,11 @@ export function JobCard({ application, delay = 0 }: JobCardProps) {
           <div className="flex gap-2">
             {!isAutoApplied && application.status === 'pending_review' && (
               <Button variant="outline" onClick={handleSave} disabled={saving}>
-                {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <BookmarkPlus className="w-4 h-4 mr-2" />}
-                Guardar
+                {saving ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generando CV...</>
+                ) : (
+                  <><BookmarkPlus className="w-4 h-4 mr-2" /> Guardar</>
+                )}
               </Button>
             )}
             <a href={job.url} target="_blank" rel="noopener noreferrer">
