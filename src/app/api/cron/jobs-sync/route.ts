@@ -148,6 +148,16 @@ export async function GET(req: NextRequest) {
         continue;
       }
 
+      // Deduplicate applicableJobs by source and external_id
+      const uniqueJobsMap = new Map();
+      for (const job of applicableJobs) {
+        const key = `${job.source}:${job.external_id}`;
+        if (!uniqueJobsMap.has(key)) {
+          uniqueJobsMap.set(key, job);
+        }
+      }
+      const deduplicatedJobs = Array.from(uniqueJobsMap.values());
+
       // 5. Process jobs in parallel batches to avoid Vercel 60s timeout
       const processInBatches = async <T>(items: T[], batchSize: number, handler: (item: T) => Promise<void>) => {
         const results = [];
@@ -218,7 +228,7 @@ export async function GET(req: NextRequest) {
         // Insert application
         const { data: appData, error: insertAppErr } = await supabase
           .from('applications')
-          .insert({
+          .upsert({
             user_id: profile.user_id,
             job_id: dbJobId,
             status: 'pending_review',
@@ -226,7 +236,7 @@ export async function GET(req: NextRequest) {
             match_score: match.score,
             match_details: { ...match, salary_confirmed: !!job.salary_text },
             applied_at: new Date().toISOString()
-          })
+          }, { onConflict: 'user_id,job_id', ignoreDuplicates: true })
           .select('id')
           .maybeSingle()
 
@@ -237,7 +247,7 @@ export async function GET(req: NextRequest) {
         }
       };
 
-      const batchResults = await processInBatches(applicableJobs, 5, jobHandler);
+      const batchResults = await processInBatches(deduplicatedJobs, 5, jobHandler);
       for (const res of batchResults) {
         if (res.status === 'rejected') {
           debugErrors.push('Batch error: ' + String(res.reason).substring(0, 100))

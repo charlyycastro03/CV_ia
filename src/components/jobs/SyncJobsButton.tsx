@@ -62,7 +62,7 @@ export function SyncJobsButton() {
       }
 
       setSuccess(true)
-      setResultMsg(saved > 0 ? `✓ ${saved} nuevas vacantes` : `✓ ${evaluated} analizadas`)
+      setResultMsg(saved > 0 ? `✓ ${saved} nuevas vacantes agregadas (revisa más abajo en la lista, están ordenadas por compatibilidad)` : `✓ ${evaluated} analizadas`)
       router.refresh()
 
       setTimeout(() => { setSuccess(false); setResultMsg('') }, 5000)

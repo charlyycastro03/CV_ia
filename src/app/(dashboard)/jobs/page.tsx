@@ -24,6 +24,13 @@ export default async function JobsPage() {
     .order('match_score', { ascending: false })
     .limit(50)
 
+  // Lightweight query for the exact total
+  const { count: totalReal } = await supabase
+    .from('applications')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .eq('status', 'pending_review')
+
   if (error) {
     console.error('Jobs query error:', error)
   }
@@ -34,7 +41,7 @@ export default async function JobsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Empleos Recomendados</h1>
           <p className="text-muted-foreground mt-2">
-            {applications?.length || 0} ofertas filtradas y evaluadas automáticamente por nuestra IA contra tu currículum.
+            Mostrando {applications?.length || 0} de {totalReal || 0} ofertas filtradas y evaluadas automáticamente por nuestra IA contra tu currículum.
           </p>
         </div>
         
