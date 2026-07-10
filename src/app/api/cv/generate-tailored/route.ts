@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateTailoredCVAndLetter } from '@/lib/services/jobMatcher'
 
+export const maxDuration = 60;
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = createClient()
@@ -69,7 +72,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true })
 
   } catch (error: any) {
-    console.error('Error in generate-tailored API:', error)
+    console.error('Error in generate-tailored API:', error.stack || error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

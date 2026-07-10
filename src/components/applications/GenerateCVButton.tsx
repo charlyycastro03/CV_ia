@@ -16,10 +16,13 @@ export function GenerateCVButton({ applicationId }: { applicationId: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ applicationId })
       })
-      if (!res.ok) throw new Error('Error generando CV')
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Error generando CV')
+      }
       router.refresh()
-    } catch (e) {
-      alert('Hubo un error generando el CV. Intenta de nuevo.')
+    } catch (e: any) {
+      alert(e.message)
     } finally {
       setLoading(false)
     }

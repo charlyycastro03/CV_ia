@@ -17,10 +17,15 @@ export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
+  const userId = req.nextUrl.searchParams.get('userId')
+  const isManual = !!userId
+
   // Auth check for cron
-  const authHeader = req.headers.get('authorization')
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!isManual) {
+    const authHeader = req.headers.get('authorization')
+    if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
   }
 
   // CRITICAL: Create supabase client INSIDE the request handler
@@ -38,19 +43,28 @@ export async function GET(req: NextRequest) {
   try {
     let totalEvaluated = 0
     let totalSaved = 0
+    let jobsAlreadyEvaluated = 0
     let debugErrors: string[] = []
 
     // Higher limits now that we removed the slow generateCV step
-    const MAX_PROFILES_PER_RUN = 2;
-    const MAX_EVALUATIONS_PER_RUN = 15;
+    const MAX_PROFILES_PER_RUN = isManual ? 1 : 2;
+    const MAX_EVALUATIONS_PER_RUN = isManual ? 30 : 15;
 
     // 1. Fetch profiles with CV data
-    const { data: profiles, error: profileErr } = await supabase
+    let profilesQuery = supabase
       .from('profiles')
       .select('user_id, cv_data, last_matched_at')
       .not('cv_data', 'is', null)
-      .order('last_matched_at', { ascending: true, nullsFirst: true })
-      .limit(MAX_PROFILES_PER_RUN)
+
+    if (isManual) {
+      profilesQuery = profilesQuery.eq('user_id', userId)
+    } else {
+      profilesQuery = profilesQuery
+        .order('last_matched_at', { ascending: true, nullsFirst: true })
+        .limit(MAX_PROFILES_PER_RUN)
+    }
+
+    const { data: profiles, error: profileErr } = await profilesQuery
 
     if (profileErr) {
       debugErrors.push('Error fetching profiles: ' + profileErr.message)
@@ -76,14 +90,17 @@ export async function GET(req: NextRequest) {
       // 2. Fetch jobs — use a FAST subset to avoid 60s timeout
       const getSubset = <T>(arr: T[], n: number) => [...arr].sort(() => 0.5 - Math.random()).slice(0, n);
 
+      const greenhouseBoards = isManual ? 4 : 2;
+      const leverBoards = isManual ? 2 : 1;
+
       const allPromises = [
         fetchRemoteJobs(15, userTargetRole),          // Remotive
         fetchArbeitnowJobs(),                          // Arbeitnow — fast, no auth
         fetchHimalayasJobs(),                          // Himalayas — fast, no auth
         fetchJobicyJobs(),                             // Jobicy — fast, no auth
         fetchRemoteOKJobs(userTargetRole),             // RemoteOK — fast, no auth
-        ...getSubset(GREENHOUSE_BOARDS, 2).map(b => fetchGreenhouseJobs(b)),  // 2 Greenhouse boards
-        ...getSubset(LEVER_BOARDS, 1).map(b => fetchLeverJobs(b)),            // 1 Lever board
+        ...getSubset(GREENHOUSE_BOARDS, greenhouseBoards).map(b => fetchGreenhouseJobs(b)),
+        ...getSubset(LEVER_BOARDS, leverBoards).map(b => fetchLeverJobs(b)),
         ...getSubset(ADZUNA_TARGET_COUNTRIES, 1).map(c =>
           fetchAdzunaJobs(`${userTargetRole} remote`, c.code, c.salaryMin)
         ),
@@ -172,7 +189,10 @@ export async function GET(req: NextRequest) {
           .eq('job_id', dbJobId)
           .maybeSingle()
 
-        if (existingApp) continue;
+        if (existingApp) {
+          jobsAlreadyEvaluated++;
+          continue;
+        }
 
         // Evaluate match with AI
         totalEvaluated++
@@ -217,8 +237,10 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      mode: isManual ? 'manual' : 'cron',
       totalEvaluated,
       totalSaved,
+      jobsAlreadyEvaluated,
       profilesProcessed: profilesProcessed.length,
       errors: debugErrors
     })

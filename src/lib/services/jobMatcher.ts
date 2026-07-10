@@ -140,9 +140,32 @@ export async function generateTailoredCVAndLetter(cvData: any, job: any): Promis
       
       clearTimeout(timeoutId)
       const textResponse = result.response.text()
-      const jsonString = textResponse.replace(/```json\n?|\n?```/g, '').trim()
       
-      return JSON.parse(jsonString) as TailoredResult
+      let jsonString = textResponse;
+      const startIdx = textResponse.indexOf('{');
+      if (startIdx !== -1) {
+        let braceCount = 0;
+        let endIdx = -1;
+        for (let i = startIdx; i < textResponse.length; i++) {
+          if (textResponse[i] === '{') braceCount++;
+          else if (textResponse[i] === '}') braceCount--;
+          
+          if (braceCount === 0) {
+            endIdx = i;
+            break;
+          }
+        }
+        if (endIdx !== -1) {
+          jsonString = textResponse.substring(startIdx, endIdx + 1);
+        }
+      }
+      
+      try {
+        return JSON.parse(jsonString) as TailoredResult
+      } catch (parseError: any) {
+        console.error('Failed to parse Gemini response. Raw response snippet:', textResponse.substring(0, 500));
+        throw new Error(`Error parseando la respuesta de la IA: ${parseError.message}`);
+      }
     } catch (e: any) {
       clearTimeout(timeoutId)
       throw e;

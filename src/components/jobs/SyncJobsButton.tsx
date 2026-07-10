@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Sparkles } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
 export function SyncJobsButton() {
   const [loading, setLoading] = useState(false)
@@ -16,7 +17,11 @@ export function SyncJobsButton() {
     setSuccess(false)
     setResultMsg('')
     try {
-      const res = await fetch('/api/cron/jobs-sync', { method: 'GET' })
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      const url = user ? `/api/cron/jobs-sync?userId=${user.id}` : '/api/cron/jobs-sync'
+
+      const res = await fetch(url, { method: 'GET' })
       const data = await res.json()
 
       if (!res.ok) {
@@ -37,6 +42,11 @@ export function SyncJobsButton() {
 
       const saved = data.totalSaved ?? 0
       const evaluated = data.totalEvaluated ?? 0
+
+      if (saved === 0 && data.jobsAlreadyEvaluated > 0) {
+        alert("Ya evaluamos todas las vacantes disponibles en esta corrida, vuelve a intentar más tarde para nuevas fuentes.")
+        return
+      }
 
       if (saved === 0 && evaluated === 0) {
         alert(`⚠️ La búsqueda terminó pero no se procesó ninguna vacante. Abre la consola (F12 > Console) para ver el detalle.\n\n${(data.errors || []).slice(0, 5).join('\n')}`)
