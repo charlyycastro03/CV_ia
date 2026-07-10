@@ -10,6 +10,13 @@ interface JobsListProps {
 
 export function JobsList({ initialApplications }: JobsListProps) {
   const [filter, setFilter] = useState<string>('all')
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
+
+  const handleFilterChange = (newFilter: string) => {
+    setFilter(newFilter)
+    setCurrentPage(1)
+  }
 
   const filteredApps = initialApplications.filter(app => {
     if (filter === 'all') return true
@@ -36,25 +43,25 @@ export function JobsList({ initialApplications }: JobsListProps) {
       <div className="flex items-center gap-2 pb-4 overflow-x-auto">
         <span className="text-sm font-medium text-muted-foreground mr-2">Filtros:</span>
         <button 
-          onClick={() => setFilter('all')}
+          onClick={() => handleFilterChange('all')}
           className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${filter === 'all' ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}`}
         >
           Todos
         </button>
         <button 
-          onClick={() => setFilter('home_office')}
+          onClick={() => handleFilterChange('home_office')}
           className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${filter === 'home_office' ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}`}
         >
           Home Office
         </button>
         <button 
-          onClick={() => setFilter('hibrido')}
+          onClick={() => handleFilterChange('hibrido')}
           className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${filter === 'hibrido' ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}`}
         >
           Híbrido
         </button>
         <button 
-          onClick={() => setFilter('presencial')}
+          onClick={() => handleFilterChange('presencial')}
           className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${filter === 'presencial' ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}`}
         >
           Presencial
@@ -72,15 +79,49 @@ export function JobsList({ initialApplications }: JobsListProps) {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-6">
-          {filteredApps.map((app, index) => (
-            <JobCard 
-              key={app.id} 
-              application={app} 
-              delay={index * 0.1}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 gap-6">
+            {filteredApps.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((app, index) => (
+              <JobCard 
+                key={app.id} 
+                application={app} 
+                delay={index * 0.1}
+              />
+            ))}
+          </div>
+          
+          {filteredApps.length > itemsPerPage && (
+            <div className="flex justify-center items-center gap-2 mt-8">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 rounded-md border bg-background text-sm font-medium disabled:opacity-50"
+              >
+                Anterior
+              </button>
+              
+              {Array.from({ length: Math.ceil(filteredApps.length / itemsPerPage) }, (_, i) => i + 1).map(page => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`w-8 h-8 rounded-md text-sm font-medium flex items-center justify-center transition-colors ${
+                    currentPage === page ? 'bg-primary text-primary-foreground' : 'border bg-background hover:bg-muted'
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+              
+              <button
+                onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredApps.length / itemsPerPage), p + 1))}
+                disabled={currentPage === Math.ceil(filteredApps.length / itemsPerPage)}
+                className="px-3 py-1 rounded-md border bg-background text-sm font-medium disabled:opacity-50"
+              >
+                Siguiente
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

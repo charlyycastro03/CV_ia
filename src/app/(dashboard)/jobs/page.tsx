@@ -22,7 +22,7 @@ export default async function JobsPage() {
     .eq('user_id', user.id)
     .eq('status', 'pending_review')
     .order('match_score', { ascending: false })
-    .limit(50)
+    .order('applied_at', { ascending: false })
 
   // Lightweight query for the exact total
   const { count: totalReal } = await supabase
