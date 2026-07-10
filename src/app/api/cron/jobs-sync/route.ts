@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
 
     // Higher limits now that we removed the slow generateCV step
     const MAX_PROFILES_PER_RUN = isManual ? 1 : 2;
-    const MAX_EVALUATIONS_PER_RUN = isManual ? 30 : 15;
+    const MAX_EVALUATIONS_PER_RUN = isManual ? 20 : 15;
 
     // 1. Fetch profiles with CV data
     let profilesQuery = supabase
@@ -148,9 +148,19 @@ export async function GET(req: NextRequest) {
         continue;
       }
 
-      // 5. Process jobs — upsert to jobs table, then evaluate match
-      for (const job of applicableJobs) {
-        if (totalEvaluated >= MAX_EVALUATIONS_PER_RUN) break;
+      // 5. Process jobs in parallel batches to avoid Vercel 60s timeout
+      const processInBatches = async <T>(items: T[], batchSize: number, handler: (item: T) => Promise<void>) => {
+        const results = [];
+        for (let i = 0; i < items.length; i += batchSize) {
+          const batch = items.slice(i, i + batchSize);
+          const batchResults = await Promise.allSettled(batch.map(handler));
+          results.push(...batchResults);
+        }
+        return results;
+      };
+
+      const jobHandler = async (job: any) => {
+        if (totalEvaluated >= MAX_EVALUATIONS_PER_RUN) return;
 
         // Upsert job to DB
         const { data: upsertedJob, error: upsertErr } = await supabase
@@ -172,13 +182,13 @@ export async function GET(req: NextRequest) {
 
         if (upsertErr) {
           debugErrors.push(`Upsert error [${job.source}:${job.external_id}]: ${upsertErr.message} (code: ${upsertErr.code})`)
-          continue
+          return
         }
 
         const dbJobId = upsertedJob?.id
         if (!dbJobId) {
           debugErrors.push(`No dbJobId for [${job.source}:${job.external_id}] — RLS?`)
-          continue
+          return
         }
 
         // Check if already evaluated
@@ -191,15 +201,18 @@ export async function GET(req: NextRequest) {
 
         if (existingApp) {
           jobsAlreadyEvaluated++;
-          continue;
+          return;
         }
 
-        // Evaluate match with AI
+        // Ensure we don't exceed limit if multiple concurrent requests hit this
+        if (totalEvaluated >= MAX_EVALUATIONS_PER_RUN) return;
+
+        // Evaluate match with AI (using 10s timeout here)
         totalEvaluated++
-        const match = await calculateJobMatch(profile.cv_data, job as any)
+        const match = await calculateJobMatch(profile.cv_data, job as any, 10000)
         if (!match) {
           debugErrors.push(`calculateJobMatch returned null for ${job.title}`)
-          continue;
+          return;
         }
 
         // Insert application
@@ -221,6 +234,13 @@ export async function GET(req: NextRequest) {
           debugErrors.push(`Insert app error: ${insertAppErr.message} (code: ${insertAppErr.code})`)
         } else if (appData) {
           totalSaved++
+        }
+      };
+
+      const batchResults = await processInBatches(applicableJobs, 5, jobHandler);
+      for (const res of batchResults) {
+        if (res.status === 'rejected') {
+          debugErrors.push('Batch error: ' + String(res.reason).substring(0, 100))
         }
       }
 

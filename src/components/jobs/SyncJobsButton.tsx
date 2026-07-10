@@ -22,10 +22,18 @@ export function SyncJobsButton() {
       const url = user ? `/api/cron/jobs-sync?userId=${user.id}` : '/api/cron/jobs-sync'
 
       const res = await fetch(url, { method: 'GET' })
-      const data = await res.json()
+      
+      const contentType = res.headers.get('content-type')
+      if (!res.ok || !contentType?.includes('application/json')) {
+        alert("El servidor tardó demasiado en responder (timeout). Intenta de nuevo en unos segundos, puede que haya menos vacantes por evaluar esta vez.")
+        return
+      }
 
-      if (!res.ok) {
-        alert(`Error del servidor: ${data.error || 'desconocido'}`)
+      let data;
+      try {
+        data = await res.json()
+      } catch (err) {
+        alert("El servidor tardó demasiado en responder (timeout). Intenta de nuevo en unos segundos, puede que haya menos vacantes por evaluar esta vez.")
         return
       }
 

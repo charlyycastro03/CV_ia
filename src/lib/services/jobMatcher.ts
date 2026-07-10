@@ -15,7 +15,7 @@ export interface TailoredResult {
   carta: string
 }
 
-export async function calculateJobMatch(cvData: any, job: RemotiveJob): Promise<MatchResult> {
+export async function calculateJobMatch(cvData: any, job: RemotiveJob, timeoutMs: number = 15000): Promise<MatchResult> {
   try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
     // Using gemini-2.5-flash as fallback
@@ -58,9 +58,9 @@ export async function calculateJobMatch(cvData: any, job: RemotiveJob): Promise<
       - Responde SOLO con el objeto JSON, nada de texto markdown antes ni después.
     `
 
-    // Timeout de 15 segundos para la llamada a Gemini
+    // Timeout configurable (por defecto 15s) para la llamada a Gemini
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 15000)
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
     try {
       const result = await Promise.race([

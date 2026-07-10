@@ -16,10 +16,21 @@ export function GenerateCVButton({ applicationId }: { applicationId: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ applicationId })
       })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Error generando CV')
+      
+      const contentType = res.headers.get('content-type')
+      if (!res.ok || !contentType?.includes('application/json')) {
+        alert("El servidor tardó demasiado en responder (timeout). Intenta de nuevo en unos segundos, puede que haya menos vacantes por evaluar esta vez.")
+        return
       }
+
+      let data;
+      try {
+        data = await res.json()
+      } catch (err) {
+        alert("El servidor tardó demasiado en responder (timeout). Intenta de nuevo en unos segundos, puede que haya menos vacantes por evaluar esta vez.")
+        return
+      }
+
       router.refresh()
     } catch (e: any) {
       alert(e.message)
